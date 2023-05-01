@@ -1,0 +1,174 @@
+#!/usr/bin/bash
+
+declare -a commands=(init build index)
+
+if [[ -n $COMP_LINE ]]; then
+    for c in "${commands[@]}"; do
+        [[ ${c:0:${#2}} == "${2,,}" ]] && echo "$c"
+    done
+    exit
+fi
+export from_format="md"
+export to_format="html"
+
+directory=$PWD
+
+if [[ ! -d "$directory/src" ]]; then
+    echo "src not found"
+    exit 1
+fi
+
+_refresh_file() {
+    if [[ -e "$1" ]]; then
+        rm "$1"
+    fi
+    touch "$1"
+    echo -e "$2" > "$1"
+}
+
+_refresh_vars_template_file() {
+    string=""
+    string+="#!/usr/bin/bash\n"
+    string+="export title=\"\$title\$\"\n"    
+    string+="\$if(tags)\$\n"
+    string+="export tags=\"\$for(tags)\$\$tags\$\$sep\$,\$endfor\$\"\n"
+    string+="\$endif\$\n"
+
+    _refresh_file "$directory/.config/.vars.template.bash" "$string"
+}
+
+_create_dir_if_not_exists() {
+    if [[ ! -d $directory/$1 ]]; then
+        mkdir -p "$directory/$1"
+    fi
+}
+
+_init() {
+    _create_dir_if_not_exists src
+    _create_dir_if_not_exists html
+    _create_dir_if_not_exists .templates
+    _create_dir_if_not_exists .config
+    _refresh_vars_template_file
+
+    echo "End of init"
+}
+
+_index() {
+    clear
+    sleep 0.5
+    directory=$PWD
+
+
+    if [[ -d "$directory/tags/" ]]; then
+        rm -rf "$directory/tags/"
+        mkdir -p "$directory/tags/"
+    fi
+
+    if [[ -e $directory/all.yml ]]; then
+        rm "$directory"/all.yml
+        touch "$directory"/all.yml
+    fi
+
+    while IFS="" read -r postsrcfile; do
+        filepath=${postsrcfile##"$directory"/src}
+        filepath="${filepath%%index.md}"
+
+
+        pandoc -s "$postsrcfile" -o "$directory/.vars.bash" --template="$directory/.vars.template.bash" 2> /dev/null
+
+        [[ ! -e $directory/vars.bash ]] && exit 1
+
+        source "$directory/.vars.bash"
+
+        {
+            echo -e "title: $title\n"   
+            echo -e "uri: $filepath\n"
+            echo -e "published_at: 25th December 1997\n"
+            echo -e ";\n"
+        } >> "$directory/all.yml" 
+
+        IFS=', ' read -r -a tags <<< "$tags"
+        for tag in "${tags[@]}"; do
+            if [[ ! -e "$directory/tags/$tag.yml" ]]; then
+                touch "$directory/tags/$tag.yml"
+            fi
+
+            {
+                echo -e "title: $title\n"
+                echo -e "uri: $filepath\n"
+                echo -e "published_at: 25th December 1997\n"
+                echo -e ";\n"
+            } >> "$directory/tags/$tag.yml"
+        done
+        tags=()
+        printf "."
+    done < <(find "$directory/src" -iname "*.md" -type f)
+
+    # get list of tag yml files
+    # loop through the found files
+    while IFS="" read -r filename; do
+        tag="${filename%.yml}"
+
+        readarray -d ";" -t posts < "$directory/tags/$filename"
+        yaml_frontmatter="---\n"
+        yaml_frontmatter+="title: Tags Page\n"
+        yaml_frontmatter+="posts:\n"
+        for post in "${posts[@]}"; do
+            mapfile -t posta <<< "$post"
+
+            for line in "${posta[@]}"; do
+                if [[ -z $line ]]; then
+                    continue
+                fi
+                if [[ "${line:0:6}" == "title:" ]]; then
+                    yaml_frontmatter+="      - $line\n"
+                else
+                    yaml_frontmatter+="        $line\n"
+                fi
+            done
+        done
+
+        yaml_frontmatter+="---\n\n"
+        yaml_frontmatter+="this is the $tag content"
+        touch "$directory/$tag.template.md"
+        echo -e "$yaml_frontmatter" > "$directory/$tag.template.md"
+
+        pandoc -s "$directory/$tag.template.md" -o "$directory/html/$tag.html" --template="$directory/tags.html"
+
+    done < <(ls "$directory/tags/")
+}
+
+_build() {
+    local new_file_paths=""
+    local first_loop=true
+
+    while IFS="" read -r data; do
+        target_file_with_full_path=${data//"src"/"html"}
+        target_directory=$(dirname "$target_file_with_full_path")
+
+        if [[ ! -d $target_directory ]]; then
+            (mkdir -p "$target_directory")
+        fi
+
+        if [[ ${data##*.} == "md" ]]; then
+            pandoc "$data" -t $to_format -o "$target_file_with_full_path"
+        else
+            cp "$data" "$target_file_with_full_path"
+        fi
+
+        echo "$target_file_with_full_path"; 
+
+        if [[ $first_loop == false ]]; then
+            new_file_paths+="\n"
+        fi
+
+        new_file_paths+="$data"
+        first_loop=false
+    done <  <(find "$directory/src" -iname "*" -type f)
+}
+
+declare CMD="$1"; shift
+for c in "${commands[@]}"; do
+    # Add an "init" check before every command ran
+    [[ $c == "$CMD" ]] && "_$c" "$@" && exit $?
+done

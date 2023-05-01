@@ -1,0 +1,13 @@
+#!/usr/bin/bash
+
+# Set the person's local bin folder as the target.
+TARGET_DIR="$HOME/.local/bin"
+
+# If the target directory doesn't exist, create it.
+[[ -e "$TARGET_DIR" ]] || mkdir -p "$TARGET_DIR"
+
+# If lupo exists in the target directory, delete it first.
+[[ -f "$TARGET_DIR/lupo" ]] && rm "$TARGET_DIR/lupo"
+
+# Finally, copy the lupo script into the target directory. 
+cp "$(pwd)/lupo" "$TARGET_DIR"
