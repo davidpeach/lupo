@@ -22,8 +22,8 @@ _confirm_init_ran() {
 _refresh_dir() {
     if [[ -d $1 ]]; then
         rm -rf "$1"
-        mkdir -p "$1"
     fi
+    mkdir -p "$1"
 }
 
 _refresh_file() {
@@ -104,7 +104,6 @@ _index() {
 
     while IFS="" read -r filename; do
         tag="${filename%.yml}"
-
         readarray -d ";" -t posts < "$directory/.tmp/tags/$filename"
         yaml_frontmatter="---\n"
         yaml_frontmatter+="title: Tags Page\n"
@@ -127,17 +126,37 @@ _index() {
         yaml_frontmatter+="---\n\n"
         yaml_frontmatter+="this is the $tag content"
         touch "$directory/$tag.template.md"
-        echo -e "$yaml_frontmatter" > "$directory/$tag.template.md"
+        echo -e "$yaml_frontmatter" > "$directory/.tmp/tags/$tag.md"
 
-        pandoc -s "$directory/$tag.template.md" -o "$directory/html/$tag.html" --template="$directory/tags.html"
+        # pandoc -s "$directory/.tmp/tags/$tag.md" -o "$directory/html/tags/$tag.html" --template="$directory/.templates/tags.template.html"
 
-    done < <(ls "$directory/tags/")
+    done < <(ls "$directory/.tmp/tags/")
     echo "FINISHED"
 }
 
 _build() {
+    
+    _index
+
     local new_file_paths=""
     local first_loop=true
+
+    while IFS="" read -r data; do
+        # @todo string PWD off front and more intelligently swap "src" for "html"
+        target_file_with_full_path=${data//".tmp"/"html"}
+
+        # @todo only the "md" at the end of the file path.
+        target_file_with_full_path=${target_file_with_full_path//"md"/"html"}
+
+        target_directory=$(dirname "$target_file_with_full_path")
+
+        if [[ ! -d $target_directory ]]; then
+            (mkdir -p "$target_directory")
+        fi
+
+        pandoc "$data" -t 'html' -o "$target_file_with_full_path" --template="$directory/.templates/tags.template.html"
+
+    done <  <(find "$directory/.tmp/tags" -iname "*.md" -type f)
 
     while IFS="" read -r data; do
         # @todo string PWD off front and more intelligently swap "src" for "html"
