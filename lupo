@@ -19,12 +19,19 @@ _confirm_init_ran() {
     done
 }
 
+_refresh_dir() {
+    if [[ -d $1 ]]; then
+        rm -rf "$1"
+        mkdir -p "$1"
+    fi
+}
+
 _refresh_file() {
     if [[ -e "$1" ]]; then
         rm "$1"
     fi
     touch "$1"
-    echo -e "$2" > "$1"
+    echo -e "${2:-}" > "$1"
 }
 
 _refresh_vars_template_file() {
@@ -58,45 +65,38 @@ _index() {
     echo "Indexing website now"
     sleep 0.5
 
-    if [[ -d "$directory/tags/" ]]; then
-        rm -rf "$directory/tags/"
-        mkdir -p "$directory/tags/"
-    fi
+    _refresh_dir "$directory/.tmp/tags/"
+    _refresh_file "$directory/.tmp/all.yml"
 
-    if [[ -e $directory/all.yml ]]; then
-        rm "$directory"/all.yml
-        touch "$directory"/all.yml
-    fi
+    while IFS="" read -r src_file; do
+        filepath=${src_file##"$directory"/src}
+        uri="${filepath%%index.md}"
 
-    while IFS="" read -r postsrcfile; do
-        filepath=${postsrcfile##"$directory"/src}
-        filepath="${filepath%%index.md}"
+        pandoc -s "$src_file" -o "$directory/.tmp/.vars.bash" --template="$directory/.config/.vars.template.bash" 2> /dev/null
 
-        pandoc -s "$postsrcfile" -o "$directory/.vars.bash" --template="$directory/.vars.template.bash" 2> /dev/null
+        [[ ! -e $directory/.tmp/.vars.bash ]] && exit 1
 
-        [[ ! -e $directory/vars.bash ]] && exit 1
-
-        source "$directory/.vars.bash"
+        source "$directory/.tmp/.vars.bash"
 
         {
             echo -e "title: $title\n"   
-            echo -e "uri: $filepath\n"
+            echo -e "uri: $uri\n"
             echo -e "published_at: 25th December 1997\n"
             echo -e ";\n"
         } >> "$directory/all.yml" 
 
         IFS=', ' read -r -a tags <<< "$tags"
         for tag in "${tags[@]}"; do
-            if [[ ! -e "$directory/tags/$tag.yml" ]]; then
-                touch "$directory/tags/$tag.yml"
+            if [[ ! -e "$directory/.tmp/tags/$tag.yml" ]]; then
+                touch "$directory/.tmp/tags/$tag.yml"
             fi
 
             {
                 echo -e "title: $title\n"
-                echo -e "uri: $filepath\n"
+                echo -e "uri: $uri\n"
                 echo -e "published_at: 25th December 1997\n"
                 echo -e ";\n"
-            } >> "$directory/tags/$tag.yml"
+            } >> "$directory/.tmp/tags/$tag.yml"
         done
         tags=()
         printf "."
@@ -105,7 +105,7 @@ _index() {
     while IFS="" read -r filename; do
         tag="${filename%.yml}"
 
-        readarray -d ";" -t posts < "$directory/tags/$filename"
+        readarray -d ";" -t posts < "$directory/.tmp/tags/$filename"
         yaml_frontmatter="---\n"
         yaml_frontmatter+="title: Tags Page\n"
         yaml_frontmatter+="posts:\n"
@@ -140,7 +140,12 @@ _build() {
     local first_loop=true
 
     while IFS="" read -r data; do
+        # @todo string PWD off front and more intelligently swap "src" for "html"
         target_file_with_full_path=${data//"src"/"html"}
+
+        # @todo only the "md" at the end of the file path.
+        target_file_with_full_path=${target_file_with_full_path//"md"/"html"}
+
         target_directory=$(dirname "$target_file_with_full_path")
 
         if [[ ! -d $target_directory ]]; then
