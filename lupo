@@ -8,15 +8,16 @@ if [[ -n $COMP_LINE ]]; then
     done
     exit
 fi
-export from_format="md"
-export to_format="html"
 
 directory=$PWD
 
-if [[ ! -d "$directory/src" ]]; then
-    echo "src not found"
-    exit 1
-fi
+_confirm_init_ran() {
+    for folder in src html .config .templates .tmp; do
+        if [[ ! -d "$directory/$folder" ]]; then
+            echo "Missing directories. Please initialize your project with lupo init" && exit 1
+        fi
+    done
+}
 
 _refresh_file() {
     if [[ -e "$1" ]]; then
@@ -48,16 +49,14 @@ _init() {
     _create_dir_if_not_exists html
     _create_dir_if_not_exists .templates
     _create_dir_if_not_exists .config
+    _create_dir_if_not_exists .tmp
     _refresh_vars_template_file
-
-    echo "End of init"
 }
 
 _index() {
     clear
+    echo "Indexing website now"
     sleep 0.5
-    directory=$PWD
-
 
     if [[ -d "$directory/tags/" ]]; then
         rm -rf "$directory/tags/"
@@ -72,7 +71,6 @@ _index() {
     while IFS="" read -r postsrcfile; do
         filepath=${postsrcfile##"$directory"/src}
         filepath="${filepath%%index.md}"
-
 
         pandoc -s "$postsrcfile" -o "$directory/.vars.bash" --template="$directory/.vars.template.bash" 2> /dev/null
 
@@ -104,8 +102,6 @@ _index() {
         printf "."
     done < <(find "$directory/src" -iname "*.md" -type f)
 
-    # get list of tag yml files
-    # loop through the found files
     while IFS="" read -r filename; do
         tag="${filename%.yml}"
 
@@ -114,9 +110,9 @@ _index() {
         yaml_frontmatter+="title: Tags Page\n"
         yaml_frontmatter+="posts:\n"
         for post in "${posts[@]}"; do
-            mapfile -t posta <<< "$post"
+            mapfile -t post <<< "$post"
 
-            for line in "${posta[@]}"; do
+            for line in "${post[@]}"; do
                 if [[ -z $line ]]; then
                     continue
                 fi
@@ -136,6 +132,7 @@ _index() {
         pandoc -s "$directory/$tag.template.md" -o "$directory/html/$tag.html" --template="$directory/tags.html"
 
     done < <(ls "$directory/tags/")
+    echo "FINISHED"
 }
 
 _build() {
@@ -151,7 +148,7 @@ _build() {
         fi
 
         if [[ ${data##*.} == "md" ]]; then
-            pandoc "$data" -t $to_format -o "$target_file_with_full_path"
+            pandoc "$data" -t 'html' -o "$target_file_with_full_path"
         else
             cp "$data" "$target_file_with_full_path"
         fi
@@ -169,6 +166,9 @@ _build() {
 
 declare CMD="$1"; shift
 for c in "${commands[@]}"; do
-    # Add an "init" check before every command ran
+    if [[ $c != 'init' ]]; then
+        _confirm_init_ran
+    fi
+    
     [[ $c == "$CMD" ]] && "_$c" "$@" && exit $?
 done
