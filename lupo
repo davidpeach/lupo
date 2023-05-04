@@ -74,7 +74,7 @@ _index() {
                 tags_array["$tag"_count]=1
             fi
 
-            if  (( tags_array["$tag"_count] > $posts_per_page )) ; then
+            if  (( tags_array["$tag"_count] > posts_per_page )) ; then
                 tags_array["$tag"_count]=$((tags_array["$tag"_count]+1))
                 tags_array["$tag"_current_page]=$((tags_array["$tag"_current_page]+1))
             fi
