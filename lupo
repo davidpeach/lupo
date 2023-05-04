@@ -15,53 +15,6 @@ declare SRC_DIRECTORY="$LUPO_DIRECTORY/src"
 declare TMP_DIRECTORY="$LUPO_DIRECTORY/.tmp"
 declare TEMPLATES_DIRECTORY="$LUPO_DIRECTORY/templates"
 
-_confirm_init_ran() {
-    for folder in src html templates .tmp; do
-        if [[ ! -d "$LUPO_DIRECTORY/$folder" ]]; then
-            echo "Missing directories. Please initialize your project with lupo init" && exit 1
-        fi
-    done
-}
-
-_refresh_dir() {
-    if [[ -d $1 ]]; then
-        rm -rf "$1"
-    fi
-    mkdir -p "$1"
-}
-
-_refresh_file() {
-    if [[ -e "$1" ]]; then
-        rm "$1"
-    fi
-    touch "$1"
-    echo -e "${2:-}" > "$1"
-}
-
-_refresh_vars_template_file() {
-    string=""
-    string+="#!/usr/bin/bash\n"
-    string+="export title=\"\$title\$\"\n"    
-    string+="\$if(tags)\$\n"
-    string+="export tags=\"\$for(tags)\$\$tags\$\$sep\$,\$endfor\$\"\n"
-    string+="\$endif\$\n"
-
-    _refresh_file "$TMP_DIRECTORY/.vars.template.bash" "$string"
-
-}
-
-_create_dir_if_not_exists() {
-    if [[ ! -d $LUPO_DIRECTORY/$1 ]]; then
-        mkdir -p "$LUPO_DIRECTORY/$1"
-    fi
-}
-
-_create_file_if_not_exists() {
-    if [[ ! -f $1 ]]; then
-        touch "$1"
-    fi
-}
-
 _init() {
     _create_dir_if_not_exists src
     _create_dir_if_not_exists html
@@ -80,7 +33,7 @@ _index() {
     _refresh_dir "$TMP_DIRECTORY/tags/"
     _refresh_file "$TMP_DIRECTORY/all.yml"
 
-    posts_per_page=1
+    posts_per_page=10
     count=0
     current_page=1
 
@@ -121,7 +74,7 @@ _index() {
                 tags_array["$tag"_count]=1
             fi
 
-            if  (( tags_array["$tag"_count] > 2 )) ; then
+            if  (( tags_array["$tag"_count] > $posts_per_page )) ; then
                 tags_array["$tag"_count]=$((tags_array["$tag"_count]+1))
                 tags_array["$tag"_current_page]=$((tags_array["$tag"_current_page]+1))
             fi
@@ -151,42 +104,6 @@ _index() {
     done < <(find "$TMP_DIRECTORY/tags/" -iname "*.yml" -type f)
 
     echo "FINISHED"
-}
-
-_determineTagName() {
-    tag="${1##"$TMP_DIRECTORY"/tags/}"
-    readarray -d "/" tagarray <<< "$tag"
-    tag="${tagarray[0]/"-"/" "/}"
-    tag="${tag^}"
-    echo "${tag[0]%%/}"
-}
-
-_build_frontmatter() {
-    tag_name=$(_determineTagName "$1")
-    readarray -d ";" -t posts < "$1"
-
-    frontmatter="---\n"
-    frontmatter+="title: $tag_name tag Page\n"
-    frontmatter+="posts:\n"
-
-    for post in "${posts[@]}"; do
-        mapfile -t post <<< "$post"
-
-        for line in "${post[@]}"; do
-            if [[ -z $line ]]; then
-                continue
-            fi
-            if [[ "${line:0:6}" == "title:" ]]; then
-                frontmatter+="      - $line\n"
-            else
-                frontmatter+="        $line\n"
-            fi
-        done
-    done
-
-    frontmatter+="---\n\n"
-    frontmatter+="this is the $tag_name content"
-    echo "$frontmatter"
 }
 
 _build() {
@@ -255,3 +172,86 @@ for c in "${commands[@]}"; do
     
     [[ $c == "$CMD" ]] && "_$c" "$@" && exit $?
 done
+
+_refresh_dir() {
+    if [[ -d $1 ]]; then
+        rm -rf "$1"
+    fi
+    mkdir -p "$1"
+}
+
+_refresh_file() {
+    if [[ -e "$1" ]]; then
+        rm "$1"
+    fi
+    touch "$1"
+    echo -e "${2:-}" > "$1"
+}
+
+_refresh_vars_template_file() {
+    string=""
+    string+="#!/usr/bin/bash\n"
+    string+="export title=\"\$title\$\"\n"    
+    string+="\$if(tags)\$\n"
+    string+="export tags=\"\$for(tags)\$\$tags\$\$sep\$,\$endfor\$\"\n"
+    string+="\$endif\$\n"
+
+    _refresh_file "$TMP_DIRECTORY/.vars.template.bash" "$string"
+
+}
+
+_create_dir_if_not_exists() {
+    if [[ ! -d $LUPO_DIRECTORY/$1 ]]; then
+        mkdir -p "$LUPO_DIRECTORY/$1"
+    fi
+}
+
+_create_file_if_not_exists() {
+    if [[ ! -f $1 ]]; then
+        touch "$1"
+    fi
+}
+
+_determineTagName() {
+    tag="${1##"$TMP_DIRECTORY"/tags/}"
+    readarray -d "/" tagarray <<< "$tag"
+    tag="${tagarray[0]/"-"/" "/}"
+    tag="${tag^}"
+    echo "${tag[0]%%/}"
+}
+
+_build_frontmatter() {
+    tag_name=$(_determineTagName "$1")
+    readarray -d ";" -t posts < "$1"
+
+    frontmatter="---\n"
+    frontmatter+="title: $tag_name tag Page\n"
+    frontmatter+="posts:\n"
+
+    for post in "${posts[@]}"; do
+        mapfile -t post <<< "$post"
+
+        for line in "${post[@]}"; do
+            if [[ -z $line ]]; then
+                continue
+            fi
+            if [[ "${line:0:6}" == "title:" ]]; then
+                frontmatter+="      - $line\n"
+            else
+                frontmatter+="        $line\n"
+            fi
+        done
+    done
+
+    frontmatter+="---\n\n"
+    frontmatter+="this is the $tag_name content"
+    echo "$frontmatter"
+}
+
+_confirm_init_ran() {
+    for folder in src html templates .tmp; do
+        if [[ ! -d "$LUPO_DIRECTORY/$folder" ]]; then
+            echo "Missing directories. Please initialize your project with lupo init" && exit 1
+        fi
+    done
+}
