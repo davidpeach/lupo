@@ -13,10 +13,10 @@ declare LUPO_DIRECTORY="$PWD"
 declare SRC_DIRECTORY="$PWD/src"
 declare CONFIG_DIRECTORY="$PWD/.config"
 declare TMP_DIRECTORY="$PWD/.tmp"
-declare TEMPLATES_DIRECTORY="$PWD/.templates"
+declare TEMPLATES_DIRECTORY="$PWD/templates"
 
 _confirm_init_ran() {
-    for folder in src html .config .templates .tmp; do
+    for folder in src html .config templates .tmp; do
         if [[ ! -d "$LUPO_DIRECTORY/$folder" ]]; then
             echo "Missing directories. Please initialize your project with lupo init" && exit 1
         fi
@@ -59,7 +59,7 @@ _create_dir_if_not_exists() {
 _init() {
     _create_dir_if_not_exists src
     _create_dir_if_not_exists html
-    _create_dir_if_not_exists .templates
+    _create_dir_if_not_exists templates
     _create_dir_if_not_exists .config
     _create_dir_if_not_exists .tmp
     _refresh_vars_template_file
@@ -70,12 +70,22 @@ _index() {
     echo "Indexing website now"
     sleep 0.5
 
+    _refresh_dir "$TMP_DIRECTORY"
     _refresh_dir "$TMP_DIRECTORY/tags/"
     _refresh_file "$TMP_DIRECTORY/all.yml"
 
+    posts_per_page=1
+    count=0
+    current_page=1
+
+    declare -A tags_array=()
+
     while IFS="" read -r src_file; do
-        filepath=${src_file##"$SRC_DIRECTORY"}
-        uri="${filepath%%index.md}"
+        count=$((count+1))
+        if [[ $count -gt $posts_per_page ]]; then
+            count=1
+            current_page=$((current_page+1))
+        fi
 
         pandoc -s "$src_file" -o "$TMP_DIRECTORY/.vars.bash" --template="$CONFIG_DIRECTORY/.vars.template.bash" 2> /dev/null
 
@@ -83,58 +93,94 @@ _index() {
 
         source "$TMP_DIRECTORY/.vars.bash"
 
-        {
-            echo -e "title: $title\n"   
-            echo -e "uri: $uri\n"
-            echo -e "published_at: 25th December 1997\n"
-            echo -e ";\n"
-        } >> "$LUPO_DIRECTORY/all.yml" 
+        dir="${src_file%%index.md}"
+        _refresh_file "$dir/fallbacks.yml"
+        echo -e "---\nmetadata:\n  title_fallback: FROM FILE" >> "$dir/fallbacks.yml"
 
-        IFS=', ' read -r -a tags <<< "$tags"
+        if [[ ! -d $TMP_DIRECTORY/$current_page ]]; then
+            mkdir -p "$TMP_DIRECTORY/$current_page"
+            touch "$TMP_DIRECTORY/$current_page/index.yml"
+        fi
+
+        for field in title uri published_at; do
+            if [[ -n "${!field}" ]]; then
+                echo -e "$field: ${!field}\n" >> "$TMP_DIRECTORY/$current_page/index.yml"
+            fi
+        done
+
+        IFS=',' read -r -a tags <<< "$tags"
+
         for tag in "${tags[@]}"; do
-            if [[ ! -e "$TMP_DIRECTORY/tags/$tag.yml" ]]; then
-                touch "$TMP_DIRECTORY/tags/$tag.yml"
+            if [[ -z ${tags_array["$tag"_count]} ]]; then
+                tags_array["$tag"_count]=1
             fi
 
-            {
-                echo -e "title: $title\n"
-                echo -e "uri: $uri\n"
-                echo -e "published_at: 25th December 1997\n"
-                echo -e ";\n"
-            } >> "$TMP_DIRECTORY/tags/$tag.yml"
+            if  (( tags_array["$tag"_count] > 2 )) ; then
+                tags_array["$tag"_count]=$((tags_array["$tag"_count]+1))
+                tags_array["$tag"_current_page]=$((tags_array["$tag"_current_page]+1))
+            fi
+
+            if [[ -z "${tags_array["$tag"_current_page]}" ]]; then
+                tags_array["$tag"_current_page]=1
+            fi
+            
+            if [[ ! -d "$TMP_DIRECTORY/tags/$tag/${tags_array["$tag"_current_page]}" ]]; then
+                mkdir -p "$TMP_DIRECTORY/tags/$tag/${tags_array["$tag"_current_page]}"
+                touch "$TMP_DIRECTORY/tags/$tag/${tags_array["$tag"_current_page]}/index.yml"
+            fi
+
+            for field in title uri published_at; do
+                if [[ -n "${!field}" ]]; then
+                    echo -e "$field: ${!field}\n" >> "$TMP_DIRECTORY/tags/$tag/${tags_array["$tag"_current_page]}/index.yml"
+                fi
+            done
         done
         tags=()
         printf "."
     done < <(find "$SRC_DIRECTORY" -iname "*.md" -type f)
 
     while IFS="" read -r filename; do
-        tag="${filename%.yml}"
-        readarray -d ";" -t posts < "$TMP_DIRECTORY/tags/$filename"
-        frontmatter="---\n"
-        frontmatter+="title: Tags Page\n"
-        frontmatter+="posts:\n"
-        for post in "${posts[@]}"; do
-            mapfile -t post <<< "$post"
+        frontmatter=$(_build_frontmatter "$filename")
+        _refresh_file "${filename/".yml"/".md"}" "$frontmatter" 
+    done < <(find "$TMP_DIRECTORY/tags/" -iname "*.yml" -type f)
 
-            for line in "${post[@]}"; do
-                if [[ -z $line ]]; then
-                    continue
-                fi
-                if [[ "${line:0:6}" == "title:" ]]; then
-                    frontmatter+="      - $line\n"
-                else
-                    frontmatter+="        $line\n"
-                fi
-            done
-        done
-
-        frontmatter+="---\n\n"
-        frontmatter+="this is the $tag content"
-        touch "$TMP_DIRECTORY/tags/$tag.md"
-        echo -e "$frontmatter" > "$TMP_DIRECTORY/tags/$tag.md"
-
-    done < <(ls "$TMP_DIRECTORY/tags/")
     echo "FINISHED"
+}
+
+_determineTagName() {
+    tag="${1##"$TMP_DIRECTORY"/tags/}"
+    readarray -d "/" tagarray <<< "$tag"
+    tag="${tagarray[0]/"-"/" "/}"
+    tag="${tag^}"
+    echo "${tag[0]%%/}"
+}
+
+_build_frontmatter() {
+    tag_name=$(_determineTagName "$1")
+    readarray -d ";" -t posts < "$1"
+
+    frontmatter="---\n"
+    frontmatter+="title: $tag_name tag Page\n"
+    frontmatter+="posts:\n"
+
+    for post in "${posts[@]}"; do
+        mapfile -t post <<< "$post"
+
+        for line in "${post[@]}"; do
+            if [[ -z $line ]]; then
+                continue
+            fi
+            if [[ "${line:0:6}" == "title:" ]]; then
+                frontmatter+="      - $line\n"
+            else
+                frontmatter+="        $line\n"
+            fi
+        done
+    done
+
+    frontmatter+="---\n\n"
+    frontmatter+="this is the $tag_name content"
+    echo "$frontmatter"
 }
 
 _build() {
@@ -147,7 +193,6 @@ _build() {
     while IFS="" read -r data; do
         # @todo string PWD off front and more intelligently swap "src" for "html"
         target_file_with_full_path=${data//".tmp"/"html"}
-
         # @todo only the "md" at the end of the file path.
         target_file_with_full_path=${target_file_with_full_path//"md"/"html"}
 
@@ -165,6 +210,8 @@ _build() {
         # @todo string PWD off front and more intelligently swap "src" for "html"
         target_file_with_full_path=${data//"src"/"html"}
 
+        src_directory=$(dirname "$data")
+
         # @todo only the "md" at the end of the file path.
         target_file_with_full_path=${target_file_with_full_path//"md"/"html"}
 
@@ -175,7 +222,10 @@ _build() {
         fi
 
         if [[ ${data##*.} == "md" ]]; then
-            pandoc -s "$data" -t 'html' -o "$target_file_with_full_path" --template="$TEMPLATES_DIRECTORY/post.template.html"
+            pandoc -s "$data" -t 'html' -o "$target_file_with_full_path" --template="$TEMPLATES_DIRECTORY/post.template.html" --defaults="$src_directory/fallbacks.yml"
+        elif [[ ${data##*.} == "yml" ]]; then
+            echo "Yaml file skipped."
+            continue
         else
             cp "$data" "$target_file_with_full_path"
         fi
