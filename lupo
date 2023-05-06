@@ -1,7 +1,20 @@
 #!/usr/bin/bash
 
-declare -a commands=(init build index)
+# ====================================================
+# These are the commands that we are
+# exposing to the person using Lupo.
+# 
+# They are delegated to their partner functions
+# in the bottom section of this script.
+# ----------------------------------------------------
+declare -a commands=(init build index deploy)
 
+# ====================================================
+# This section enables the tab completion
+# that is built into bash.
+# 
+# Just add `complete -C lupo lupo` to your .bashrc
+# ----------------------------------------------------
 if [[ -n $COMP_LINE ]]; then
     for c in "${commands[@]}"; do
         [[ ${c:0:${#2}} == "${2,,}" ]] && echo "$c"
@@ -9,12 +22,58 @@ if [[ -n $COMP_LINE ]]; then
     exit
 fi
 
+# ====================================================
+# Directory path constants.
+# ----------------------------------------------------
 declare LUPO_DIRECTORY="$PWD"
 declare CONFIG_FILE=$LUPO_DIRECTORY/.config
 declare SRC_DIRECTORY="$LUPO_DIRECTORY/src"
+declare HTML_DIRECTORY="$LUPO_DIRECTORY/html"
 declare TMP_DIRECTORY="$LUPO_DIRECTORY/.tmp"
 declare TEMPLATES_DIRECTORY="$LUPO_DIRECTORY/templates"
 
+# ====================================================
+# Variables that can be set in your `.config` file.
+# e.g.:
+# remote_user: "myuser"
+# site_title: "My Website"
+# ----------------------------------------------------
+declare remote_user=""
+declare site_title=""
+declare ssh_identity_key=""
+declare domain_name=""
+declare remote_directory=""
+
+# ====================================================
+# Parse the configuration file `.config` 
+# into variables of the same name. 
+# These are declared above.
+# ----------------------------------------------------
+_parse_configuration() {
+    readarray -t lines < "$LUPO_DIRECTORY/.config"
+    for line in "${lines[@]}"; do
+        [[ -z "$line" ]] && continue
+        readarray -d ":" config_line <<< "$line"
+        
+        key="${config_line[0]/:/}"
+        value="${config_line[1]//\"/}"
+        value="${value## }"
+        value="${value//$'\n'}"
+
+        case $key in
+            site_title) site_title="$value";;
+            remote_user) remote_user="$value";;
+            ssh_identity_key) ssh_identity_key="$value";;
+            domain_name) domain_name="$value";;
+            remote_directory) remote_directory="$value";;
+        esac
+
+    done 
+}
+
+# ====================================================
+# Delete and remake and existing directory.
+# ----------------------------------------------------
 _refresh_dir() {
     if [[ -d $1 ]]; then
         rm -rf "$1"
@@ -22,6 +81,10 @@ _refresh_dir() {
     mkdir -p "$1"
 }
 
+# ====================================================
+# Delete and remake a file with optional 
+# second argument for file content.
+# ----------------------------------------------------
 _refresh_file() {
     if [[ -e "$1" ]]; then
         rm "$1"
@@ -30,6 +93,10 @@ _refresh_file() {
     echo -e "${2:-}" > "$1"
 }
 
+# ====================================================
+# Remake the template file for exporting variables 
+# from markdown file to this script.
+# ----------------------------------------------------
 _refresh_vars_template_file() {
     string=""
     string+="#!/usr/bin/bash\n"
@@ -42,18 +109,28 @@ _refresh_vars_template_file() {
 
 }
 
+# ====================================================
+# Create a directory if it doesn't already exist.
+# ----------------------------------------------------
 _create_dir_if_not_exists() {
     if [[ ! -d $LUPO_DIRECTORY/$1 ]]; then
         mkdir -p "$LUPO_DIRECTORY/$1"
     fi
 }
 
+# ====================================================
+# Create a file if it doesn't already exist.
+# ----------------------------------------------------
 _create_file_if_not_exists() {
     if [[ ! -f $1 ]]; then
         touch "$1"
     fi
 }
 
+# ====================================================
+# Work out the tag name from the full
+# path to the tag markdown file.
+# ----------------------------------------------------
 _determineTagName() {
     tag="${1##"$TMP_DIRECTORY"/tags/}"
     readarray -d "/" tagarray <<< "$tag"
@@ -62,6 +139,10 @@ _determineTagName() {
     echo "${tag[0]%%/}"
 }
 
+# ====================================================
+# Create the frontmatter metadata from the
+# contents of the yaml filepath given.
+# ----------------------------------------------------
 _build_frontmatter() {
     tag_name=$(_determineTagName "$1")
     readarray -d ";" -t posts < "$1"
@@ -90,6 +171,9 @@ _build_frontmatter() {
     echo "$frontmatter"
 }
 
+# ====================================================
+# Confirm that all required files and folders exist.
+# ----------------------------------------------------
 _confirm_init_ran() {
     for folder in src html templates .tmp; do
         if [[ ! -d "$LUPO_DIRECTORY/$folder" ]]; then
@@ -98,6 +182,10 @@ _confirm_init_ran() {
     done
 }
 
+# ====================================================
+# initialization function to make the 
+# current folder into a "Lupo" project.
+# ----------------------------------------------------
 _init() {
     _create_dir_if_not_exists src
     _create_dir_if_not_exists html
@@ -106,6 +194,10 @@ _init() {
     _create_file_if_not_exists .config
 }
 
+# ====================================================
+# Create all of the required "index"-like pages.
+# e.g. paginated blog roll; paginated tags pages.
+# ----------------------------------------------------
 _index() {
     clear
     echo -e "Indexing website now\n"
@@ -123,6 +215,10 @@ _index() {
     declare -A tags_array=()
 
     while IFS="" read -r src_file; do
+        
+        filepath=${src_file##"$SRC_DIRECTORY"}
+        uri="${filepath%%index.md}"
+        
         count=$((count+1))
         if [[ $count -gt $posts_per_page ]]; then
             count=1
@@ -130,7 +226,6 @@ _index() {
         fi
 
         pandoc -s "$src_file" -o "$TMP_DIRECTORY/.vars.bash" --template="$TMP_DIRECTORY/.vars.template.bash" 2> /dev/null
-        
 
         [[ ! -e $TMP_DIRECTORY/.vars.bash ]] && exit 1
 
@@ -145,11 +240,12 @@ _index() {
             touch "$TMP_DIRECTORY/$current_page/index.yml"
         fi
 
-        for field in title uri published_at; do
+        for field in title uri date; do
             if [[ -n "${!field}" ]]; then
                 echo -e "$field: ${!field}\n" >> "$TMP_DIRECTORY/$current_page/index.yml"
             fi
         done
+        echo -e ";\n" >> "$TMP_DIRECTORY/$current_page/index.yml"
 
         IFS=',' read -r -a tags <<< "$tags"
 
@@ -172,11 +268,12 @@ _index() {
                 touch "$TMP_DIRECTORY/tags/$tag/${tags_array["$tag"_current_page]}/index.yml"
             fi
 
-            for field in title uri published_at; do
+            for field in title uri date; do
                 if [[ -n "${!field}" ]]; then
                     echo -e "$field: ${!field}\n" >> "$TMP_DIRECTORY/tags/$tag/${tags_array["$tag"_current_page]}/index.yml"
                 fi
             done
+            echo -e ";\n" >> "$TMP_DIRECTORY/tags/$tag/${tags_array["$tag"_current_page]}/index.yml"
         done
         tags=()
         printf "."
@@ -191,6 +288,12 @@ _index() {
     sleep 0.5
 }
 
+# ====================================================
+# Build the website from the markdown files.
+# Firstly the Lupo-generated files in the 
+# `.tmp` directory, followed by the 
+# owner's original pages and posts.
+# ----------------------------------------------------
 _build() {
     
     _index
@@ -211,7 +314,7 @@ _build() {
 
         pandoc -s "$data" -t 'html' -o "$target_file_with_full_path" --template="$TEMPLATES_DIRECTORY/tags.template.html"
 
-        echo "."
+        printf "."
 
     done <  <(find "$TMP_DIRECTORY/tags" -iname "*.md" -type f)
 
@@ -233,23 +336,41 @@ _build() {
         fi
 
         if [[ ${data##*.} == "md" ]]; then
-            pandoc -s "$data" -t 'html' -o "$target_file_with_full_path" --template="$TEMPLATES_DIRECTORY/post.template.html" --defaults="$src_directory/fallbacks.yml"
+            pandoc -s "$data" -t 'html' -o "$target_file_with_full_path" --template="$TEMPLATES_DIRECTORY/post.template.html" --defaults="$src_directory/fallbacks.yml" 2> /dev/null
         elif [[ ${data##*.} == "yml" ]]; then
-            echo "Yaml file skipped."
             continue
         else
             cp "$data" "$target_file_with_full_path"
         fi
 
-        echo "."
+        printf "."
 
     done <  <(find "$SRC_DIRECTORY" -iname "*" -type f)
 
-    echo-e "\nBuild complete"
+    echo -e "\nBuild complete"
 }
 
+# ====================================================
+# Deploy the `html` folder contents to a remote server.
+# The variables of these should be set 
+# in the project's `.config` file.
+# ----------------------------------------------------
+_deploy() {
+    rsync -Paz --delete -e "ssh -l $remote_user -i $ssh_identity_key" "$HTML_DIRECTORY/" "$remote_user"@"$domain_name":"$remote_directory"
+}
+
+# ====================================================
+# This area delegates functions to their implementation.
+# It uses the $commands variable from the top
+# to know which commands are allowed.
+# 
+# It then passes a "function" to a "_function" partner.
+# ----------------------------------------------------
 declare CMD="$1"; shift
 for c in "${commands[@]}"; do
+
+    _parse_configuration
+
     if [[ $c != 'init' ]]; then
         _confirm_init_ran
     fi
