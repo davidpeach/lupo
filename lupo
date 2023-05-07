@@ -113,8 +113,8 @@ _refresh_vars_template_file() {
 # Create a directory if it doesn't already exist.
 # ----------------------------------------------------
 _create_dir_if_not_exists() {
-    if [[ ! -d $LUPO_DIRECTORY/$1 ]]; then
-        mkdir -p "$LUPO_DIRECTORY/$1"
+    if [[ ! -d $1 ]]; then
+        mkdir -p "$1"
     fi
 }
 
@@ -137,6 +137,18 @@ _determineTagName() {
     tag="${tagarray[0]/"-"/" "/}"
     tag="${tag^}"
     echo "${tag[0]%%/}"
+}
+
+_get_target_file_path_from_src_file_path() {
+    target_file_path="${1##"$2"}"
+    target_file_path="${target_file_path%%md}"
+    target_file_path="$target_file_path"html
+    echo "$HTML_DIRECTORY$target_file_path"
+}
+
+_get_uri_from_src_file() {
+    filepath=${1##"$SRC_DIRECTORY"}
+    echo "${filepath%%index.md}"
 }
 
 # ====================================================
@@ -187,11 +199,11 @@ _confirm_init_ran() {
 # current folder into a "Lupo" project.
 # ----------------------------------------------------
 _init() {
-    _create_dir_if_not_exists src
-    _create_dir_if_not_exists html
-    _create_dir_if_not_exists templates
-    _create_dir_if_not_exists .tmp
-    _create_file_if_not_exists .config
+    _create_dir_if_not_exists "$SRC_DIRECTORY"
+    _create_dir_if_not_exists "$HTML_DIRECTORY"
+    _create_dir_if_not_exists "$TEMPLATES_DIRECTORY"
+    _create_dir_if_not_exists "$TMP_DIRECTORY"
+    _create_file_if_not_exists "$CONFIG_FILE"
 }
 
 # ====================================================
@@ -216,10 +228,10 @@ _index() {
 
     while IFS="" read -r src_file; do
         
-        filepath=${src_file##"$SRC_DIRECTORY"}
-        uri="${filepath%%index.md}"
-        
+        uri=$(_get_uri_from_src_file "$src_file")
+
         count=$((count+1))
+
         if [[ $count -gt $posts_per_page ]]; then
             count=1
             current_page=$((current_page+1))
@@ -235,10 +247,8 @@ _index() {
         _refresh_file "$dir/fallbacks.yml"
         echo -e "---\nmetadata:\n  title_fallback: FROM FILE" >> "$dir/fallbacks.yml"
 
-        if [[ ! -d $TMP_DIRECTORY/$current_page ]]; then
-            mkdir -p "$TMP_DIRECTORY/$current_page"
-            touch "$TMP_DIRECTORY/$current_page/index.yml"
-        fi
+        _create_dir_if_not_exists "$TMP_DIRECTORY/$current_page"
+        _create_file_if_not_exists "$TMP_DIRECTORY/$current_page/index.yml"
 
         for field in title uri date; do
             if [[ -n "${!field}" ]]; then
@@ -263,10 +273,8 @@ _index() {
                 tags_array["$tag"_current_page]=1
             fi
             
-            if [[ ! -d "$TMP_DIRECTORY/tags/$tag/${tags_array["$tag"_current_page]}" ]]; then
-                mkdir -p "$TMP_DIRECTORY/tags/$tag/${tags_array["$tag"_current_page]}"
-                touch "$TMP_DIRECTORY/tags/$tag/${tags_array["$tag"_current_page]}/index.yml"
-            fi
+            _create_dir_if_not_exists "$TMP_DIRECTORY/tags/$tag/${tags_array["$tag"_current_page]}"
+            _create_file_if_not_exists "$TMP_DIRECTORY/tags/$tag/${tags_array["$tag"_current_page]}/index.yml"
 
             for field in title uri date; do
                 if [[ -n "${!field}" ]]; then
@@ -296,23 +304,16 @@ _index() {
 # ----------------------------------------------------
 _build() {
     
-    _index
+    # _index
 
     echo -e "Building tag source files.\n"
 
-    while IFS="" read -r data; do
-        # @todo string PWD off front and more intelligently swap "src" for "html"
-        target_file_with_full_path=${data//".tmp"/"html"}
-        # @todo only the "md" at the end of the file path.
-        target_file_with_full_path=${target_file_with_full_path//"md"/"html"}
+    while IFS="" read -r src_file; do
+        target_file_path=$(_get_target_file_path_from_src_file_path "$src_file" "$TMP_DIRECTORY")
 
-        target_directory=$(dirname "$target_file_with_full_path")
+        _create_dir_if_not_exists "$(dirname "$target_file_path")"
 
-        if [[ ! -d $target_directory ]]; then
-            (mkdir -p "$target_directory")
-        fi
-
-        pandoc -s "$data" -t 'html' -o "$target_file_with_full_path" --template="$TEMPLATES_DIRECTORY/tags.template.html"
+        pandoc -s "$src_file" -t 'html' -o "$target_file_path" --template="$TEMPLATES_DIRECTORY/tags.template.html"
 
         printf "."
 
@@ -320,27 +321,19 @@ _build() {
 
     echo -e "\nBuilding website\n"
 
-    while IFS="" read -r data; do
-        # @todo string PWD off front and more intelligently swap "src" for "html"
-        target_file_with_full_path=${data//"src"/"html"}
+    while IFS="" read -r src_file; do
+        target_file_path=$(_get_target_file_path_from_src_file_path "$src_file" "$SRC_DIRECTORY")
 
-        src_directory=$(dirname "$data")
+        _create_dir_if_not_exists "$(dirname "$target_file_path")"
 
-        # @todo only the "md" at the end of the file path.
-        target_file_with_full_path=${target_file_with_full_path//"md"/"html"}
+        src_directory=$(dirname "$src_file")
 
-        target_directory=$(dirname "$target_file_with_full_path")
-
-        if [[ ! -d $target_directory ]]; then
-            (mkdir -p "$target_directory")
-        fi
-
-        if [[ ${data##*.} == "md" ]]; then
-            pandoc -s "$data" -t 'html' -o "$target_file_with_full_path" --template="$TEMPLATES_DIRECTORY/post.template.html" --defaults="$src_directory/fallbacks.yml" 2> /dev/null
-        elif [[ ${data##*.} == "yml" ]]; then
+        if [[ ${src_file##*.} == "md" ]]; then
+            pandoc -s "$src_file" -t 'html' -o "$target_file_with_full_path" --template="$TEMPLATES_DIRECTORY/post.template.html" --defaults="$src_directory/fallbacks.yml" 2> /dev/null
+        elif [[ ${src_file##*.} == "yml" ]]; then
             continue
         else
-            cp "$data" "$target_file_with_full_path"
+            cp "$src_file" "$target_file_with_full_path"
         fi
 
         printf "."
