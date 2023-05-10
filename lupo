@@ -7,7 +7,7 @@
 # They are delegated to their partner functions
 # in the bottom section of this script.
 # ----------------------------------------------------
-declare -a commands=(init build index deploy)
+declare -a commands=(init build index index_tags deploy)
 
 # ====================================================
 # This section enables the tab completion
@@ -31,6 +31,7 @@ declare SRC_DIRECTORY="$LUPO_DIRECTORY/src"
 declare HTML_DIRECTORY="$LUPO_DIRECTORY/html"
 declare TMP_DIRECTORY="$LUPO_DIRECTORY/.tmp"
 declare TEMPLATES_DIRECTORY="$LUPO_DIRECTORY/templates"
+declare BUILD_DIRECTORY="$LUPO_DIRECTORY/build"
 
 # ====================================================
 # Variables that can be set in your `.config` file.
@@ -101,9 +102,12 @@ _refresh_vars_template_file() {
     string=""
     string+="#!/usr/bin/bash\n"
     string+="export title=\"\$title\$\"\n"    
+    string+="export date=\"\$date\$\"\n"    
     string+="\$if(tags)\$\n"
     string+="export tags=\"\$for(tags)\$\$tags\$\$sep\$,\$endfor\$\"\n"
     string+="\$endif\$\n"
+    #body=$(I)
+    #string+="export body=[\$body\$]\n"    
 
     _refresh_file "$TMP_DIRECTORY/.vars.template.bash" "$string"
 
@@ -160,21 +164,24 @@ _build_frontmatter() {
     readarray -d ";" -t posts < "$1"
 
     frontmatter="---\n"
-    frontmatter+="title: $tag_name tag Page\n"
+    frontmatter+="title: \"$tag_name tag Page\"\n"
     frontmatter+="posts:\n"
 
     for post in "${posts[@]}"; do
         mapfile -t post <<< "$post"
 
+        first_loop=true
         for line in "${post[@]}"; do
             if [[ -z $line ]]; then
                 continue
             fi
-            if [[ "${line:0:6}" == "title:" ]]; then
+            #if [[ "${line:0:6}" == "title:" ]]; then
+            if [[ "$first_loop" == true ]]; then
                 frontmatter+="      - $line\n"
             else
                 frontmatter+="        $line\n"
             fi
+            first_loop=false
         done
     done
 
@@ -206,6 +213,12 @@ _init() {
     _create_file_if_not_exists "$CONFIG_FILE"
 }
 
+_create_tag_src_pages() {
+    while IFS="" read -r filename; do
+        frontmatter=$(_build_frontmatter "$filename")
+        _refresh_file "${filename/".yml"/".md"}" "$frontmatter" 
+    done < <(find "$TMP_DIRECTORY/tags/" -iname "*.yml" -type f)
+}
 # ====================================================
 # Create all of the required "index"-like pages.
 # e.g. paginated blog roll; paginated tags pages.
@@ -219,6 +232,7 @@ _index() {
     _refresh_dir "$TMP_DIRECTORY/tags/"
     _refresh_file "$TMP_DIRECTORY/all.yml"
     _refresh_vars_template_file
+    _refresh_dir "$BUILD_DIRECTORY"
 
     posts_per_page=10
     count=0
@@ -227,7 +241,7 @@ _index() {
     declare -A tags_array=()
 
     while IFS="" read -r src_file; do
-        
+
         uri=$(_get_uri_from_src_file "$src_file")
 
         count=$((count+1))
@@ -247,15 +261,19 @@ _index() {
         _refresh_file "$dir/fallbacks.yml"
         echo -e "---\nmetadata:\n  title_fallback: FROM FILE" >> "$dir/fallbacks.yml"
 
-        _create_dir_if_not_exists "$TMP_DIRECTORY/$current_page"
-        _create_file_if_not_exists "$TMP_DIRECTORY/$current_page/index.yml"
+        current_page_yml_filepath="$TMP_DIRECTORY/$current_page/index.yml"
+        _create_dir_if_not_exists $(dirname "$current_page_yml_filepath")
+        _create_file_if_not_exists "$current_page_yml_filepath"
 
         for field in title uri date; do
             if [[ -n "${!field}" ]]; then
-                echo -e "$field: ${!field}\n" >> "$TMP_DIRECTORY/$current_page/index.yml"
+                echo -e "$field: \"${!field}\"\n" >> "$current_page_yml_filepath"
+            else
+              echo -e "$field: \"\"\n" >> "$current_page_yml_filepath"
+
             fi
         done
-        echo -e ";\n" >> "$TMP_DIRECTORY/$current_page/index.yml"
+        echo -e ";\n" >> "$current_page_yml_filepath"
 
         IFS=',' read -r -a tags <<< "$tags"
 
@@ -272,28 +290,31 @@ _index() {
             if [[ -z "${tags_array["$tag"_current_page]}" ]]; then
                 tags_array["$tag"_current_page]=1
             fi
-            
-            _create_dir_if_not_exists "$TMP_DIRECTORY/tags/$tag/${tags_array["$tag"_current_page]}"
-            _create_file_if_not_exists "$TMP_DIRECTORY/tags/$tag/${tags_array["$tag"_current_page]}/index.yml"
+
+            current_tag_yml_filepath="$TMP_DIRECTORY/tags/$tag/${tags_array["$tag"_current_page]}/index.yml"
+            _create_dir_if_not_exists $(dirname "$current_tag_yml_path")
+            _create_file_if_not_exists "$current_tag_yml_filepath"
 
             for field in title uri date; do
                 if [[ -n "${!field}" ]]; then
-                    echo -e "$field: ${!field}\n" >> "$TMP_DIRECTORY/tags/$tag/${tags_array["$tag"_current_page]}/index.yml"
+                    echo -e "$field: \"${!field}\"\n" >> "$current_tag_yml_filepath"
+                else
+                    echo -e "$field: \"\"\n" >> "$current_tag_yml_filepath"
                 fi
             done
-            echo -e ";\n" >> "$TMP_DIRECTORY/tags/$tag/${tags_array["$tag"_current_page]}/index.yml"
+            echo -e ";\n" >> "$current_tag_yml_filepath"
         done
         tags=()
         printf "."
     done < <(find "$SRC_DIRECTORY" -iname "*.md" -type f)
 
-    while IFS="" read -r filename; do
-        frontmatter=$(_build_frontmatter "$filename")
-        _refresh_file "${filename/".yml"/".md"}" "$frontmatter" 
-    done < <(find "$TMP_DIRECTORY/tags/" -iname "*.yml" -type f)
+    _create_tag_src_pages
 
     echo -e "Finshed indexng\n\n"
     sleep 0.5
+    echo -e "Moving src files to tmp folder"
+
+    cp -r $HTML_DIRECTORY/* $TMP_DIRECTORY/
 }
 
 # ====================================================
@@ -303,41 +324,36 @@ _index() {
 # owner's original pages and posts.
 # ----------------------------------------------------
 _build() {
-    
-    # _index
-
     echo -e "Building tag source files.\n"
 
     while IFS="" read -r src_file; do
         target_file_path=$(_get_target_file_path_from_src_file_path "$src_file" "$TMP_DIRECTORY")
-
         _create_dir_if_not_exists "$(dirname "$target_file_path")"
-
         pandoc -s "$src_file" -t 'html' -o "$target_file_path" --template="$TEMPLATES_DIRECTORY/tags.template.html"
-
         printf "."
-
     done <  <(find "$TMP_DIRECTORY/tags" -iname "*.md" -type f)
 
     echo -e "\nBuilding website\n"
 
     while IFS="" read -r src_file; do
         target_file_path=$(_get_target_file_path_from_src_file_path "$src_file" "$SRC_DIRECTORY")
-
         _create_dir_if_not_exists "$(dirname "$target_file_path")"
 
-        src_directory=$(dirname "$src_file")
-
         if [[ ${src_file##*.} == "md" ]]; then
-            pandoc -s "$src_file" -t 'html' -o "$target_file_with_full_path" --template="$TEMPLATES_DIRECTORY/post.template.html" --defaults="$src_directory/fallbacks.yml" 2> /dev/null
+
+            pandoc -s "$src_file" \
+                -t 'html' \
+                -o "$target_file_path" \
+                --template="$TEMPLATES_DIRECTORY/post.template.html" \
+                --defaults="$(dirname "$src_file")/fallbacks.yml" 2> /dev/null
+
         elif [[ ${src_file##*.} == "yml" ]]; then
             continue
         else
-            cp "$src_file" "$target_file_with_full_path"
+            cp "$src_file" "$target_file_path"
         fi
 
         printf "."
-
     done <  <(find "$SRC_DIRECTORY" -iname "*" -type f)
 
     echo -e "\nBuild complete"
