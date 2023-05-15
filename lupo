@@ -145,8 +145,10 @@ _determineTagName() {
 
 _get_target_file_path_from_src_file_path() {
     target_file_path="${1##"$2"}"
-    target_file_path="${target_file_path%%md}"
-    target_file_path="$target_file_path"html
+    if [[ ${1: -2} == "md" ]]; then
+      target_file_path="${target_file_path%%md}"
+      target_file_path="$target_file_path"html
+    fi
     echo "$HTML_DIRECTORY$target_file_path"
 }
 
@@ -260,9 +262,10 @@ _index() {
         dir="${src_file%%index.md}"
         _refresh_file "$dir/fallbacks.yml"
         echo -e "---\nmetadata:\n  title_fallback: FROM FILE" >> "$dir/fallbacks.yml"
-
+        #echo "WUT"
+        #echo "$(dirname "$current_page_yml_filepath") ---- here"
         current_page_yml_filepath="$TMP_DIRECTORY/$current_page/index.yml"
-        _create_dir_if_not_exists $(dirname "$current_page_yml_filepath")
+        _create_dir_if_not_exists "$(dirname "$current_page_yml_filepath")"
         _create_file_if_not_exists "$current_page_yml_filepath"
 
         for field in title uri date; do
@@ -292,7 +295,7 @@ _index() {
             fi
 
             current_tag_yml_filepath="$TMP_DIRECTORY/tags/$tag/${tags_array["$tag"_current_page]}/index.yml"
-            _create_dir_if_not_exists $(dirname "$current_tag_yml_path")
+            _create_dir_if_not_exists "$(dirname "$current_tag_yml_filepath")"
             _create_file_if_not_exists "$current_tag_yml_filepath"
 
             for field in title uri date; do
@@ -314,7 +317,14 @@ _index() {
     sleep 0.5
     echo -e "Moving src files to tmp folder"
 
-    cp -r $HTML_DIRECTORY/* $TMP_DIRECTORY/
+    cp -r "$SRC_DIRECTORY/"* "$TMP_DIRECTORY"/
+}
+
+_determine_template() {
+  end_of_path="${1##"$HTML_DIRECTORY"/}"
+  [[ "${end_of_path:0:4}" == "tags" ]] && echo "$TEMPLATES_DIRECTORY/tags.template.html" && exit 0
+
+  echo "$TEMPLATES_DIRECTORY/post.template.html"
 }
 
 # ====================================================
@@ -324,27 +334,24 @@ _index() {
 # owner's original pages and posts.
 # ----------------------------------------------------
 _build() {
-    echo -e "Building tag source files.\n"
+
+    echo -e "\nBuilding website11\n"
 
     while IFS="" read -r src_file; do
+        [[ ${src_file: -3} == "yml" ]] && continue
+        [[ ${src_file: -4} == "bash" ]] && continue
+
         target_file_path=$(_get_target_file_path_from_src_file_path "$src_file" "$TMP_DIRECTORY")
         _create_dir_if_not_exists "$(dirname "$target_file_path")"
-        pandoc -s "$src_file" -t 'html' -o "$target_file_path" --template="$TEMPLATES_DIRECTORY/tags.template.html"
-        printf "."
-    done <  <(find "$TMP_DIRECTORY/tags" -iname "*.md" -type f)
 
-    echo -e "\nBuilding website\n"
-
-    while IFS="" read -r src_file; do
-        target_file_path=$(_get_target_file_path_from_src_file_path "$src_file" "$SRC_DIRECTORY")
-        _create_dir_if_not_exists "$(dirname "$target_file_path")"
+        template=$(_determine_template "$target_file_path")
 
         if [[ ${src_file##*.} == "md" ]]; then
 
             pandoc -s "$src_file" \
                 -t 'html' \
                 -o "$target_file_path" \
-                --template="$TEMPLATES_DIRECTORY/post.template.html" \
+                --template="$template" \
                 --defaults="$(dirname "$src_file")/fallbacks.yml" 2> /dev/null
 
         elif [[ ${src_file##*.} == "yml" ]]; then
@@ -354,7 +361,7 @@ _build() {
         fi
 
         printf "."
-    done <  <(find "$SRC_DIRECTORY" -iname "*" -type f)
+    done <  <(find "$TMP_DIRECTORY" -iname "*" -type f)
 
     echo -e "\nBuild complete"
 }
@@ -378,10 +385,9 @@ _deploy() {
 declare CMD="$1"; shift
 for c in "${commands[@]}"; do
 
-    _parse_configuration
-
     if [[ $c != 'init' ]]; then
         _confirm_init_ran
+        _parse_configuration
     fi
     
     [[ $c == "$CMD" ]] && "_$c" "$@" && exit $?
