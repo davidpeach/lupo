@@ -9,6 +9,9 @@ pages: for example, if there are posts that have a tag of "websites", a
 "websites" archive page will be created with a list of the tagged posts
 contained.
 
+Once configured, you can write / edit pages locally; build the new
+pages, or do a full website build; then deploy straight to your server.
+
 ## Installation
 ```bash
 git clone https://github.com/davidpeach/lupo
