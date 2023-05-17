@@ -7,7 +7,7 @@
 # They are delegated to their partner functions
 # in the bottom section of this script.
 # ----------------------------------------------------
-declare -a commands=(init build index index_tags deploy)
+declare -a commands=(init index convert_file build deploy new edit)
 
 # ====================================================
 # This section enables the tab completion
@@ -22,40 +22,29 @@ if [[ -n $COMP_LINE ]]; then
     exit
 fi
 
-# ====================================================
-# Directory path constants.
-# ----------------------------------------------------
+# --- Directory path constants.
 declare LUPO_DIRECTORY="$PWD"
 declare CONFIG_FILE=$LUPO_DIRECTORY/.config
 declare SRC_DIRECTORY="$LUPO_DIRECTORY/src"
 declare HTML_DIRECTORY="$LUPO_DIRECTORY/html"
 declare TMP_DIRECTORY="$LUPO_DIRECTORY/.tmp"
 declare TEMPLATES_DIRECTORY="$LUPO_DIRECTORY/templates"
-declare BUILD_DIRECTORY="$LUPO_DIRECTORY/build"
+declare THEME_DIRECTORY="$LUPO_DIRECTORY/themes"
 
-# ====================================================
-# Variables that can be set in your `.config` file.
-# e.g.:
-# remote_user: "myuser"
-# site_title: "My Website"
-# ----------------------------------------------------
+# --- Configuration Variables
 declare remote_user=""
 declare site_title=""
 declare ssh_identity_key=""
 declare domain_name=""
 declare remote_directory=""
+declare theme=""
 
-# ====================================================
-# Parse the configuration file `.config` 
-# into variables of the same name. 
-# These are declared above.
-# ----------------------------------------------------
 _parse_configuration() {
     readarray -t lines < "$LUPO_DIRECTORY/.config"
     for line in "${lines[@]}"; do
         [[ -z "$line" ]] && continue
         readarray -d ":" config_line <<< "$line"
-        
+
         key="${config_line[0]/:/}"
         value="${config_line[1]//\"/}"
         value="${value## }"
@@ -67,14 +56,12 @@ _parse_configuration() {
             ssh_identity_key) ssh_identity_key="$value";;
             domain_name) domain_name="$value";;
             remote_directory) remote_directory="$value";;
+            theme) theme="$value";;
         esac
 
-    done 
+    done
 }
 
-# ====================================================
-# Delete and remake and existing directory.
-# ----------------------------------------------------
 _refresh_dir() {
     if [[ -d $1 ]]; then
         rm -rf "$1"
@@ -82,10 +69,6 @@ _refresh_dir() {
     mkdir -p "$1"
 }
 
-# ====================================================
-# Delete and remake a file with optional 
-# second argument for file content.
-# ----------------------------------------------------
 _refresh_file() {
     if [[ -e "$1" ]]; then
         rm "$1"
@@ -94,37 +77,24 @@ _refresh_file() {
     echo -e "${2:-}" > "$1"
 }
 
-# ====================================================
-# Remake the template file for exporting variables 
-# from markdown file to this script.
-# ----------------------------------------------------
 _refresh_vars_template_file() {
     string=""
     string+="#!/usr/bin/bash\n"
-    string+="export title=\"\$title\$\"\n"    
-    string+="export date=\"\$date\$\"\n"    
+    string+="export title=\"\$title\$\"\n"
+    string+="export date=\"\$date\$\"\n"
     string+="\$if(tags)\$\n"
     string+="export tags=\"\$for(tags)\$\$tags\$\$sep\$,\$endfor\$\"\n"
     string+="\$endif\$\n"
-    #body=$(I)
-    #string+="export body=[\$body\$]\n"    
 
     _refresh_file "$TMP_DIRECTORY/.vars.template.bash" "$string"
-
 }
 
-# ====================================================
-# Create a directory if it doesn't already exist.
-# ----------------------------------------------------
 _create_dir_if_not_exists() {
     if [[ ! -d $1 ]]; then
         mkdir -p "$1"
     fi
 }
 
-# ====================================================
-# Create a file if it doesn't already exist.
-# ----------------------------------------------------
 _create_file_if_not_exists() {
     if [[ ! -f $1 ]]; then
         touch "$1"
@@ -135,7 +105,7 @@ _create_file_if_not_exists() {
 # Work out the tag name from the full
 # path to the tag markdown file.
 # ----------------------------------------------------
-_determineTagName() {
+_get_tag_name_from_tag_source_file_path() {
     tag="${1##"$TMP_DIRECTORY"/tags/}"
     readarray -d "/" tagarray <<< "$tag"
     tag="${tagarray[0]/"-"/" "/}"
@@ -143,8 +113,10 @@ _determineTagName() {
     echo "${tag[0]%%/}"
 }
 
+
 _get_target_file_path_from_src_file_path() {
-    target_file_path="${1##"$2"}"
+  full_src_path="$(realpath $1)"
+    target_file_path="${full_src_path##"$2"}"
     if [[ ${1: -2} == "md" ]]; then
       target_file_path="${target_file_path%%md}"
       target_file_path="$target_file_path"html
@@ -162,11 +134,10 @@ _get_uri_from_src_file() {
 # contents of the yaml filepath given.
 # ----------------------------------------------------
 _build_frontmatter() {
-    tag_name=$(_determineTagName "$1")
     readarray -d ";" -t posts < "$1"
 
     frontmatter="---\n"
-    frontmatter+="title: \"$tag_name tag Page\"\n"
+    frontmatter+="title: \"$2 \"\n"
     frontmatter+="posts:\n"
 
     for post in "${posts[@]}"; do
@@ -177,7 +148,7 @@ _build_frontmatter() {
             if [[ -z $line ]]; then
                 continue
             fi
-            #if [[ "${line:0:6}" == "title:" ]]; then
+
             if [[ "$first_loop" == true ]]; then
                 frontmatter+="      - $line\n"
             else
@@ -188,13 +159,9 @@ _build_frontmatter() {
     done
 
     frontmatter+="---\n\n"
-    frontmatter+="this is the $tag_name content"
     echo "$frontmatter"
 }
 
-# ====================================================
-# Confirm that all required files and folders exist.
-# ----------------------------------------------------
 _confirm_init_ran() {
     for folder in src html templates .tmp; do
         if [[ ! -d "$LUPO_DIRECTORY/$folder" ]]; then
@@ -203,28 +170,64 @@ _confirm_init_ran() {
     done
 }
 
-# ====================================================
-# initialization function to make the 
-# current folder into a "Lupo" project.
-# ----------------------------------------------------
+_create_tag_src_pages() {
+    while IFS="" read -r filename; do
+        tag_name=$(_get_tag_name_from_tag_source_file_path "$filename")
+        frontmatter=$(_build_frontmatter "$filename" "$tag_name")
+        _refresh_file "${filename/".yml"/".md"}" "$frontmatter"
+    done < <(find "$TMP_DIRECTORY/tags/" -iname "*.yml" -type f)
+}
+
+_create_archive_page() {
+    filename="$TMP_DIRECTORY/all/index.yml"
+    frontmatter=$(_build_frontmatter "$filename"  "Archive")
+    _refresh_file "${filename/".yml"/".md"}" "$frontmatter"
+}
+
+_determine_template() {
+  end_of_path="${1##"$HTML_DIRECTORY"/}"
+  [[ "${end_of_path:0:4}" == "tags" ]] && echo "$THEME_DIRECTORY/$theme/templates/tags.template.html" && exit 0
+  [[ "${end_of_path:0:3}" == "all" ]] && echo "$THEME_DIRECTORY/$theme/templates/tags.template.html" && exit 0
+
+  echo "$THEME_DIRECTORY/$theme/templates/default.template.html"
+}
+
+_convert_file() {
+  if [[ ${1: -3} == "yml" ]]; then
+    return
+  fi
+  if [[ ${1: -4} == "bash" ]]; then
+    return
+  fi
+
+  target_file_path=$(_get_target_file_path_from_src_file_path "$1" "${2:-"$SRC_DIRECTORY"}")
+
+  echo "$target_file_path"
+  _create_dir_if_not_exists "$(dirname "$target_file_path")"
+
+  template=$(_determine_template "$target_file_path")
+#echo "$template"
+  if [[ ${1##*.} == "md" ]]; then
+    pandoc -s "$1" \
+      -t 'html' \
+      -o "$target_file_path" \
+      --template="$template"
+
+    return
+  fi
+
+  cp "$1" "$target_file_path"
+}
+
 _init() {
     _create_dir_if_not_exists "$SRC_DIRECTORY"
     _create_dir_if_not_exists "$HTML_DIRECTORY"
     _create_dir_if_not_exists "$TEMPLATES_DIRECTORY"
     _create_dir_if_not_exists "$TMP_DIRECTORY"
+    _create_dir_if_not_exists "$THEME_DIRECTORY"
     _create_file_if_not_exists "$CONFIG_FILE"
 }
 
-_create_tag_src_pages() {
-    while IFS="" read -r filename; do
-        frontmatter=$(_build_frontmatter "$filename")
-        _refresh_file "${filename/".yml"/".md"}" "$frontmatter" 
-    done < <(find "$TMP_DIRECTORY/tags/" -iname "*.yml" -type f)
-}
-# ====================================================
-# Create all of the required "index"-like pages.
-# e.g. paginated blog roll; paginated tags pages.
-# ----------------------------------------------------
 _index() {
     clear
     echo -e "Indexing website now\n"
@@ -232,26 +235,14 @@ _index() {
 
     _refresh_dir "$TMP_DIRECTORY"
     _refresh_dir "$TMP_DIRECTORY/tags/"
-    _refresh_file "$TMP_DIRECTORY/all.yml"
     _refresh_vars_template_file
-    _refresh_dir "$BUILD_DIRECTORY"
 
-    posts_per_page=10
     count=0
-    current_page=1
-
-    declare -A tags_array=()
 
     while IFS="" read -r src_file; do
 
+        count=$(($count + 1))
         uri=$(_get_uri_from_src_file "$src_file")
-
-        count=$((count+1))
-
-        if [[ $count -gt $posts_per_page ]]; then
-            count=1
-            current_page=$((current_page+1))
-        fi
 
         pandoc -s "$src_file" -o "$TMP_DIRECTORY/.vars.bash" --template="$TMP_DIRECTORY/.vars.template.bash" 2> /dev/null
 
@@ -259,111 +250,95 @@ _index() {
 
         source "$TMP_DIRECTORY/.vars.bash"
 
-        dir="${src_file%%index.md}"
-        _refresh_file "$dir/fallbacks.yml"
-        echo -e "---\nmetadata:\n  title_fallback: FROM FILE" >> "$dir/fallbacks.yml"
-        #echo "WUT"
-        #echo "$(dirname "$current_page_yml_filepath") ---- here"
-        current_page_yml_filepath="$TMP_DIRECTORY/$current_page/index.yml"
-        _create_dir_if_not_exists "$(dirname "$current_page_yml_filepath")"
-        _create_file_if_not_exists "$current_page_yml_filepath"
+        all_yml_file_path="$TMP_DIRECTORY/all/index.yml"
+        _create_dir_if_not_exists "$(dirname "$all_yml_file_path")"
+        _create_file_if_not_exists "$all_yml_file_path"
 
         for field in title uri date; do
             if [[ -n "${!field}" ]]; then
-                echo -e "$field: \"${!field}\"\n" >> "$current_page_yml_filepath"
+                echo -e "$field: \"${!field}\"\n" >> "$all_yml_file_path"
             else
-              echo -e "$field: \"\"\n" >> "$current_page_yml_filepath"
-
+              echo -e "$field: \"\"\n" >> "$all_yml_file_path"
             fi
         done
-        echo -e ";\n" >> "$current_page_yml_filepath"
+        echo -e ";\n" >> "$all_yml_file_path"
 
         IFS=',' read -r -a tags <<< "$tags"
 
         for tag in "${tags[@]}"; do
-            if [[ -z ${tags_array["$tag"_count]} ]]; then
-                tags_array["$tag"_count]=1
-            fi
-
-            if  (( tags_array["$tag"_count] > posts_per_page )) ; then
-                tags_array["$tag"_count]=$((tags_array["$tag"_count]+1))
-                tags_array["$tag"_current_page]=$((tags_array["$tag"_current_page]+1))
-            fi
-
-            if [[ -z "${tags_array["$tag"_current_page]}" ]]; then
-                tags_array["$tag"_current_page]=1
-            fi
-
-            current_tag_yml_filepath="$TMP_DIRECTORY/tags/$tag/${tags_array["$tag"_current_page]}/index.yml"
-            _create_dir_if_not_exists "$(dirname "$current_tag_yml_filepath")"
-            _create_file_if_not_exists "$current_tag_yml_filepath"
+            tag_yml_filepath="$TMP_DIRECTORY/tags/$tag/index.yml"
+            _create_dir_if_not_exists "$(dirname "$tag_yml_filepath")"
+            _create_file_if_not_exists "$tag_yml_filepath"
 
             for field in title uri date; do
                 if [[ -n "${!field}" ]]; then
-                    echo -e "$field: \"${!field}\"\n" >> "$current_tag_yml_filepath"
+                    echo -e "$field: \"${!field}\"\n" >> "$tag_yml_filepath"
                 else
-                    echo -e "$field: \"\"\n" >> "$current_tag_yml_filepath"
+                    echo -e "$field: \"\"\n" >> "$tag_yml_filepath"
                 fi
             done
-            echo -e ";\n" >> "$current_tag_yml_filepath"
+            echo -e ";\n" >> "$tag_yml_filepath"
         done
         tags=()
-        printf "."
+        printf "  "
+        if (( $count % 20 == 0 )); then
+          printf " - $count\n"
+        fi
     done < <(find "$SRC_DIRECTORY" -iname "*.md" -type f)
 
+    echo -e "Creating markdown pages.\n\n"
     _create_tag_src_pages
+    _create_archive_page
 
-    echo -e "Finshed indexng\n\n"
+    echo -e "\n\nFinished indexing"
     sleep 0.5
-    echo -e "Moving src files to tmp folder"
+    echo -e "\n\nMoving src files to tmp folder"
 
-    cp -r "$SRC_DIRECTORY/"* "$TMP_DIRECTORY"/
 }
 
-_determine_template() {
-  end_of_path="${1##"$HTML_DIRECTORY"/}"
-  [[ "${end_of_path:0:4}" == "tags" ]] && echo "$TEMPLATES_DIRECTORY/tags.template.html" && exit 0
-
-  echo "$TEMPLATES_DIRECTORY/post.template.html"
-}
-
-# ====================================================
-# Build the website from the markdown files.
-# Firstly the Lupo-generated files in the 
-# `.tmp` directory, followed by the 
-# owner's original pages and posts.
-# ----------------------------------------------------
 _build() {
 
-    echo -e "\nBuilding website11\n"
+    cp -r "$SRC_DIRECTORY/"* "$TMP_DIRECTORY"/
+
+    echo -e "\n\nBuilding website"
+
+    count=0
 
     while IFS="" read -r src_file; do
-        [[ ${src_file: -3} == "yml" ]] && continue
-        [[ ${src_file: -4} == "bash" ]] && continue
+        count=$((count + 1))
+        _convert_file "$src_file" "$TMP_DIRECTORY"
 
-        target_file_path=$(_get_target_file_path_from_src_file_path "$src_file" "$TMP_DIRECTORY")
-        _create_dir_if_not_exists "$(dirname "$target_file_path")"
-
-        template=$(_determine_template "$target_file_path")
-
-        if [[ ${src_file##*.} == "md" ]]; then
-
-            pandoc -s "$src_file" \
-                -t 'html' \
-                -o "$target_file_path" \
-                --template="$template" \
-                --defaults="$(dirname "$src_file")/fallbacks.yml" 2> /dev/null
-
-        elif [[ ${src_file##*.} == "yml" ]]; then
-            continue
-        else
-            cp "$src_file" "$target_file_path"
+        printf "  "
+        if (( $count % 20 == 0 )); then
+          printf " - $count\n"
         fi
-
-        printf "."
     done <  <(find "$TMP_DIRECTORY" -iname "*" -type f)
 
     echo -e "\nBuild complete"
+}
+
+_new() {
+  now=$(date "+%Y/%m")
+  printf "Please enter the post title: "
+  read post_title
+
+  post_directory="${post_title,,}"
+  post_directory="$SRC_DIRECTORY/$now/${post_directory// /-}"
+
+  mkdir -p "$post_directory"
+  touch "$post_directory/index.md"
+  echo -e  "---\ntitle: $post_title\n---\n" > "$post_directory/index.md"
+
+  "$EDITOR" "$post_directory/index.md"
+}
+
+_edit() {
+  if [[ ! -x "$(command -v fzf)" ]]; then
+    echo "Please install fzf and add to your PATH to use the edit helper function"
+    exit 1
+  fi
+
+  find "$SRC_DIRECTORY" -type f | fzf | xargs -o "$EDITOR"
 }
 
 # ====================================================
@@ -379,7 +354,7 @@ _deploy() {
 # This area delegates functions to their implementation.
 # It uses the $commands variable from the top
 # to know which commands are allowed.
-# 
+#
 # It then passes a "function" to a "_function" partner.
 # ----------------------------------------------------
 declare CMD="$1"; shift
@@ -389,7 +364,7 @@ for c in "${commands[@]}"; do
         _confirm_init_ran
         _parse_configuration
     fi
-    
+
     [[ $c == "$CMD" ]] && "_$c" "$@" && exit $?
 done
 
