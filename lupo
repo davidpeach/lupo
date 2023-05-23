@@ -29,7 +29,6 @@ declare SRC_DIRECTORY="$LUPO_DIRECTORY/src"
 declare HTML_DIRECTORY="$LUPO_DIRECTORY/html"
 declare TMP_DIRECTORY="$LUPO_DIRECTORY/tmp"
 declare TEMPLATES_DIRECTORY="$LUPO_DIRECTORY/templates"
-declare THEME_DIRECTORY="$LUPO_DIRECTORY/themes"
 
 # --- Configuration Variables
 declare remote_user=""
@@ -225,7 +224,6 @@ _init() {
     _create_dir_if_not_exists "$HTML_DIRECTORY"
     _create_dir_if_not_exists "$TEMPLATES_DIRECTORY"
     _create_dir_if_not_exists "$TMP_DIRECTORY"
-    _create_dir_if_not_exists "$THEME_DIRECTORY"
     _create_file_if_not_exists "$CONFIG_FILE"
 }
 
