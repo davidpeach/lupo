@@ -7,7 +7,7 @@
 # They are delegated to their partner functions
 # in the bottom section of this script.
 # ----------------------------------------------------
-declare -a commands=(init index convert_file build deploy new edit)
+declare -a commands=(init index convert_file build deploy post edit)
 
 # ====================================================
 # This section enables the tab completion
@@ -27,7 +27,7 @@ declare LUPO_DIRECTORY="$PWD"
 declare CONFIG_FILE=$LUPO_DIRECTORY/.config
 declare SRC_DIRECTORY="$LUPO_DIRECTORY/src"
 declare HTML_DIRECTORY="$LUPO_DIRECTORY/html"
-declare TMP_DIRECTORY="$LUPO_DIRECTORY/.tmp"
+declare TMP_DIRECTORY="$LUPO_DIRECTORY/tmp"
 declare TEMPLATES_DIRECTORY="$LUPO_DIRECTORY/templates"
 declare THEME_DIRECTORY="$LUPO_DIRECTORY/themes"
 
@@ -115,7 +115,7 @@ _get_tag_name_from_tag_source_file_path() {
 
 
 _get_target_file_path_from_src_file_path() {
-  full_src_path="$(realpath $1)"
+    full_src_path="$(realpath $1)"
     target_file_path="${full_src_path##"$2"}"
     if [[ ${1: -2} == "md" ]]; then
       target_file_path="${target_file_path%%md}"
@@ -163,7 +163,8 @@ _build_frontmatter() {
 }
 
 _confirm_init_ran() {
-    for folder in src html templates .tmp; do
+    for folder in html src templates tmp; do
+
         if [[ ! -d "$LUPO_DIRECTORY/$folder" ]]; then
             echo "Missing directories. Please initialize your project with lupo init" && exit 1
         fi
@@ -186,37 +187,37 @@ _create_archive_page() {
 
 _determine_template() {
   end_of_path="${1##"$HTML_DIRECTORY"/}"
-  [[ "${end_of_path:0:4}" == "tags" ]] && echo "$THEME_DIRECTORY/$theme/templates/tags.template.html" && exit 0
-  [[ "${end_of_path:0:3}" == "all" ]] && echo "$THEME_DIRECTORY/$theme/templates/tags.template.html" && exit 0
+  [[ "${end_of_path:0:4}" == "tags" ]] && echo "$TEMPLATES_DIRECTORY/tags.template.html" && exit 0
+  [[ "${end_of_path:0:3}" == "all" ]] && echo "$TEMPLATES_DIRECTORY/tags.template.html" && exit 0
 
-  echo "$THEME_DIRECTORY/$theme/templates/default.template.html"
+  echo "$TEMPLATES_DIRECTORY/default.template.html"
 }
 
 _convert_file() {
   if [[ ${1: -3} == "yml" ]]; then
     return
   fi
+
   if [[ ${1: -4} == "bash" ]]; then
     return
   fi
 
   target_file_path=$(_get_target_file_path_from_src_file_path "$1" "${2:-"$SRC_DIRECTORY"}")
 
-  echo "$target_file_path"
   _create_dir_if_not_exists "$(dirname "$target_file_path")"
 
   template=$(_determine_template "$target_file_path")
-#echo "$template"
+
   if [[ ${1##*.} == "md" ]]; then
     pandoc -s "$1" \
       -t 'html' \
       -o "$target_file_path" \
-      --template="$template"
+      --template="$template" 2> /dev/null
 
     return
   fi
 
-  cp "$1" "$target_file_path"
+  cp -r "$1" "$target_file_path"
 }
 
 _init() {
@@ -307,7 +308,6 @@ _build() {
     while IFS="" read -r src_file; do
         count=$((count + 1))
         _convert_file "$src_file" "$TMP_DIRECTORY"
-
         printf "  "
         if (( $count % 20 == 0 )); then
           printf " - $count\n"
@@ -317,7 +317,7 @@ _build() {
     echo -e "\nBuild complete"
 }
 
-_new() {
+_post() {
   now=$(date "+%Y/%m")
   printf "Please enter the post title: "
   read post_title
