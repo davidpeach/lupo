@@ -17,11 +17,16 @@ pages, or do a full website build; then deploy straight to your server.
 git clone https://github.com/davidpeach/lupo
 cd ./lupo
 ./install
+cd ../
+rm -rf ./lupo
 ```
 
-## Usage example - creating your first single homepage
+## Dependancies
+- [Pandoc](https://pandoc.org/installing.html) is **required** for convert markdown files into html. This is quite a hefty requirement along with its own dependancies, I am looking for alternatives.
+
+## Usage example - creating your first page
 1. Install `lupo` as per the directions above.
-2. Go into a directory that you want to use as your website.
+2. mkdir my-website && cd my-website
 3. Run `lupo init`.
 4. Go into your `src` directory and create a file called `index.md`
 5. Add the following content:
