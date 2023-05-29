@@ -1,13 +1,19 @@
 #!/usr/bin/bash
 
 # Set the person's local bin folder as the target.
-TARGET_DIR="$HOME/.local/bin"
+TARGET_BIN_DIR="$HOME/.local/bin"
+TARGET_SHARE_DIR="$HOME/.local/share/lupo"
 
-# If the target directory doesn't exist, create it.
-[[ -e "$TARGET_DIR" ]] || mkdir -p "$TARGET_DIR"
+# If the target directories don't exist, create them.
+[[ -e "$TARGET_BIN_DIR" ]] || mkdir -p "$TARGET_BIN_DIR"
+[[ -e "$TARGET_SHARE_DIR" ]] || mkdir -p "$TARGET_SHARE_DIR"
 
-# If lupo exists in the target directory, delete it first.
-[[ -f "$TARGET_DIR/lupo" ]] && rm "$TARGET_DIR/lupo"
+# If lupo exists in the target bin directory, delete it first.
+[[ -f "$TARGET_BIN_DIR/lupo" ]] && rm "$TARGET_BIN_DIR/lupo"
+
+# Copy the default templates and stylesheet into the share folder.
+cp -r "$(pwd)/templates" "$TARGET_SHARE_DIR"
+cp "$(pwd)/style.css" "$TARGET_SHARE_DIR"
 
 # Finally, copy the lupo script into the target directory. 
-cp "$(pwd)/lupo" "$TARGET_DIR"
+cp "$(pwd)/lupo" "$TARGET_BIN_DIR"

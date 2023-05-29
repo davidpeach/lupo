@@ -1,0 +1,29 @@
+<!doctype html>
+<head>
+    <meta charset="utf-8" />
+    <title>
+        $if(title)$
+            $title$
+        $else$
+            $uri$
+        $endif$
+    </title>
+    <link rel=stylesheet href="/style.css" />
+</head>
+<body>
+    <h1>
+        $if(title)$
+            $title$
+        $else$
+            $uri$
+        $endif$
+    </h1>
+    $if(tags)$
+    <div>
+        $for(tags)$
+        <a href="/tags/$tags$/">$tags$</a>
+        $endfor$
+    </div>
+    $endif$
+    <div>$body$</div>
+</body>

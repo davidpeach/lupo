@@ -225,6 +225,13 @@ _init() {
     _create_dir_if_not_exists "$TEMPLATES_DIRECTORY"
     _create_dir_if_not_exists "$TMP_DIRECTORY"
     _create_file_if_not_exists "$CONFIG_FILE"
+    if [[ -e "$HOME/.local/share/lupo/templates"  ]]; then
+        cp -r "$HOME/.local/share/lupo/templates" "$LUPO_DIRECTORY"
+    fi
+
+    if [[ -f "$HOME/.local/share/lupo/style.css" ]]; then
+        cp "$HOME/.local/share/lupo/style.css" "$SRC_DIRECTORY"
+    fi
 }
 
 _index() {

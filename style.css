@@ -1,0 +1,50 @@
+html {
+    font-size: 16px;
+}
+
+body {
+    font-size: 100%;
+    background: #bada55;
+    padding-left: 3%;
+    padding-right: 3%;
+}
+
+p {
+    max-width: 60rem;
+    line-height: 1.7;
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+}
+
+@media(min-width:48rem) {
+    body {
+        font-size: 120%;
+    }
+}
+
+@media(min-width:65rem) {
+    body {
+        font-size: 140%;
+    }
+}
+
+@media(min-width:80rem) {
+    body {
+        font-size: 160%;
+    }
+}
+
+@media(min-width:110rem) {
+    body {
+        font-size: 180%;
+    }
+}
+
+@media(min-width:140rem) {
+    body {
+        font-size: 210%;
+    }
+}
