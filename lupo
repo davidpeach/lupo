@@ -1,20 +1,15 @@
 #!/usr/bin/bash
 
-# ====================================================
-# These are the commands that we are
-# exposing to the person using Lupo.
-# 
-# They are delegated to their partner functions
-# in the bottom section of this script.
-# ----------------------------------------------------
-declare -a commands=(init index convert_file build deploy post edit)
+declare -a commands=(
+    init 
+    index 
+    convert_file 
+    build 
+    deploy 
+    post 
+    edit
+)
 
-# ====================================================
-# This section enables the tab completion
-# that is built into bash.
-# 
-# Just add `complete -C lupo lupo` to your .bashrc
-# ----------------------------------------------------
 if [[ -n $COMP_LINE ]]; then
     for c in "${commands[@]}"; do
         [[ ${c:0:${#2}} == "${2,,}" ]] && echo "$c"
@@ -22,7 +17,6 @@ if [[ -n $COMP_LINE ]]; then
     exit
 fi
 
-# --- Directory path constants.
 declare LUPO_DIRECTORY="$PWD"
 declare CONFIG_FILE=$LUPO_DIRECTORY/.config
 declare SRC_DIRECTORY="$LUPO_DIRECTORY/src"
@@ -30,13 +24,10 @@ declare HTML_DIRECTORY="$LUPO_DIRECTORY/html"
 declare TMP_DIRECTORY="$LUPO_DIRECTORY/tmp"
 declare TEMPLATES_DIRECTORY="$LUPO_DIRECTORY/templates"
 
-# --- Configuration Variables
 declare remote_user=""
-declare site_title=""
 declare ssh_identity_key=""
 declare domain_name=""
 declare remote_directory=""
-declare theme=""
 
 _parse_configuration() {
     readarray -t lines < "$LUPO_DIRECTORY/.config"
@@ -50,12 +41,10 @@ _parse_configuration() {
         value="${value//$'\n'}"
 
         case $key in
-            site_title) site_title="$value";;
             remote_user) remote_user="$value";;
             ssh_identity_key) ssh_identity_key="$value";;
             domain_name) domain_name="$value";;
             remote_directory) remote_directory="$value";;
-            theme) theme="$value";;
         esac
 
     done
