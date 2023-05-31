@@ -1,4 +1,4 @@
-<img src="lupo.png" />
+<img src="lupo.jpg" />
 
 # Lupo
 
