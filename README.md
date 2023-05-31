@@ -24,6 +24,8 @@ rm -rf ./lupo
 
 ## Dependancies
 - [Pandoc](https://pandoc.org/installing.html) is **required** for convert markdown files into html. This is quite a hefty requirement along with its own dependancies, I am looking for alternatives.
+- [rsync](https://rsync.samba.org/) is **required** for using the `push` command.
+- [inotifywait](https://man.archlinux.org/man/inotifywait.1) is **required** for using the watch command.
 
 ## Usage
 
@@ -84,6 +86,10 @@ You are completely free to structure your website exactly how you want to.
 ## Deploying to your remote server
 
 You can set Lupo up to easily deploy to a remote server that you control.
+
+```
+lupo push
+```
 
 Setting the following configuration items in your `.config` file will allow you to do this:
 
