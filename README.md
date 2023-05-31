@@ -1,3 +1,5 @@
+<img src="lupo.png" />
+
 # Lupo
 
 Lupo is a basic static website generator written in Bash. It will
