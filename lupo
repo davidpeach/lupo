@@ -20,7 +20,7 @@ if [[ -n $COMP_LINE ]]; then
 fi
 
 declare LUPO_DIRECTORY="$PWD"
-declare CONFIG_FILE=$LUPO_DIRECTORY/.config
+declare CONFIG_FILE="$LUPO_DIRECTORY/.config"
 declare SRC_DIRECTORY="$LUPO_DIRECTORY/src"
 declare HTML_DIRECTORY="$LUPO_DIRECTORY/html"
 declare TMP_DIRECTORY="$LUPO_DIRECTORY/tmp"
