@@ -5,9 +5,11 @@ declare -a commands=(
     index 
     convert_file 
     build 
-    deploy 
+    push 
     post 
     edit
+    watch
+    live
 )
 
 if [[ -n $COMP_LINE ]]; then
@@ -291,6 +293,33 @@ _index() {
 
 }
 
+_watch() {
+    inotifywait -r -m "$SRC_DIRECTORY" -e modify -e delete -e create |
+        while read dir action file; do
+            case "$action" in
+                CREATE)
+                    _convert_file "$dir$file"
+                    ;;
+                MODIFY)
+                    _convert_file "$dir$file"
+                    ;;
+                DELETE)
+                    filepath=$dir$file
+                    filepath=${filepath/#$SRC_DIRECTORY/$HTML_DIRECTORY}
+                    filepath="${filepath/%md/html}"
+                    rm "$filepath"
+                    ;;
+            esac
+            if [[ $1 == 'live' ]]; then
+                _push
+            fi
+        done
+}
+
+_live() {
+    _watch "live"
+}
+
 _build() {
 
     cp -r "$SRC_DIRECTORY/"* "$TMP_DIRECTORY"/
@@ -340,7 +369,7 @@ _edit() {
 # The variables of these should be set 
 # in the project's `.config` file.
 # ----------------------------------------------------
-_deploy() {
+_push() {
     rsync -Paz --delete -e "ssh -l $remote_user -i $ssh_identity_key" "$HTML_DIRECTORY/" "$remote_user"@"$domain_name":"$remote_directory"
 }
 
