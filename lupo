@@ -105,7 +105,7 @@ _get_tag_name_from_tag_source_file_path() {
 
 
 _get_target_file_path_from_src_file_path() {
-    full_src_path="$(realpath $1)"
+    full_src_path="$(realpath "$1")"
     target_file_path="${full_src_path##"$2"}"
     if [[ ${1: -2} == "md" ]]; then
       target_file_path="${target_file_path%%md}"
@@ -236,8 +236,7 @@ _index() {
 
     while IFS="" read -r src_file; do
 
-        count=$(($count + 1))
-        uri=$(_get_uri_from_src_file "$src_file")
+        count=$((count + 1))
 
         pandoc -s "$src_file" -o "$TMP_DIRECTORY/.vars.bash" --template="$TMP_DIRECTORY/.vars.template.bash" 2> /dev/null
 
@@ -276,8 +275,8 @@ _index() {
         done
         tags=()
         printf "  "
-        if (( $count % 20 == 0 )); then
-          printf " - $count\n"
+        if (( count % 20 == 0 )); then
+          printf " - %s\n" $count
         fi
     done < <(find "$SRC_DIRECTORY" -iname "*.md" -type f)
 
@@ -292,7 +291,7 @@ _index() {
 
 _watch() {
     inotifywait -r -m "$SRC_DIRECTORY" -e modify -e delete -e create |
-        while read dir action file; do
+        while read -r dir action file; do
             case "$action" in
                 CREATE)
                     _convert_file "$dir$file"
@@ -335,8 +334,8 @@ _build() {
         count=$((count + 1))
         _convert_file "$src_file" "$TMP_DIRECTORY"
         printf "  "
-        if (( $count % 20 == 0 )); then
-          printf " - $count\n"
+        if (( count % 20 == 0 )); then
+          printf " - %s\n" $count
         fi
     done <  <(find "$TMP_DIRECTORY" -iname "*" -type f)
 
@@ -346,7 +345,7 @@ _build() {
 _post() {
   now=$(date "+%Y/%m")
   printf "Please enter the post title: "
-  read post_title
+  read -r post_title
 
   post_directory="${post_title,,}"
   post_directory="$SRC_DIRECTORY/$now/${post_directory// /-}"
