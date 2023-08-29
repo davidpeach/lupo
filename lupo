@@ -72,6 +72,7 @@ _refresh_vars_template_file() {
     string+="#!/usr/bin/bash\n"
     string+="export title=\"\$title\$\"\n"
     string+="export date=\"\$date\$\"\n"
+    string+="export timestamp=\"\$timestamp\$\"\n"
     string+="\$if(tags)\$\n"
     string+="export tags=\"\$for(tags)\$\$tags\$\$sep\$,\$endfor\$\"\n"
     string+="\$endif\$\n"
@@ -165,8 +166,8 @@ _create_tag_src_pages() {
     done < <(find "$TMP_DIRECTORY/tags/" -iname "*.yml" -type f)
 }
 
-_create_archive_page() {
-    filename="$TMP_DIRECTORY/all/index.yml"
+_create_index_page() {
+    filename="$TMP_DIRECTORY/index/index.yml"
     frontmatter=$(_build_frontmatter "$filename"  "Archive")
     _refresh_file "${filename/".yml"/".md"}" "$frontmatter"
 }
@@ -174,7 +175,7 @@ _create_archive_page() {
 _determine_template() {
     end_of_path="${1##"$HTML_DIRECTORY"/}"
     [[ "${end_of_path:0:4}" == "tags" ]] && echo "$TEMPLATES_DIRECTORY/tags.template.html" && exit 0
-    [[ "${end_of_path:0:3}" == "all" ]] && echo "$TEMPLATES_DIRECTORY/tags.template.html" && exit 0
+    [[ "${end_of_path:0:11}" == "index/index" ]] && echo "$TEMPLATES_DIRECTORY/tags.template.html" && exit 0
 
     echo "$TEMPLATES_DIRECTORY/default.template.html"
 }
@@ -254,11 +255,11 @@ _index() {
 
         source "$TMP_DIRECTORY/.vars.bash"
 
-        all_yml_file_path="$TMP_DIRECTORY/all/index.yml"
+        all_yml_file_path="$TMP_DIRECTORY/index/index.yml"
         _create_dir_if_not_exists "$(dirname "$all_yml_file_path")"
         _create_file_if_not_exists "$all_yml_file_path"
 
-        for field in title uri date; do
+        for field in title uri date timestamp; do
             if [[ -n "${!field}" ]]; then
                 echo -e "$field: \"${!field}\"\n" >> "$all_yml_file_path"
             else
@@ -294,7 +295,7 @@ _index() {
 
     _create_tag_src_pages
 
-    _create_archive_page
+    _create_index_page
 
     echo -e "\n\nFinished indexing"
 }
@@ -355,7 +356,7 @@ _watch() {
     _post() {
         now=$(date --rfc-3339=ns)
         uri_date=$(date -d "$now" "+%Y/%m/%d")
-        post_date=$(date -d "$now" "+%B %d, %Y")
+        post_date=$(date -d "$now" "+%F %T")
         timestamp=$(date -d "$now" +%s)
 
         printf "Please enter the post title: "
@@ -366,7 +367,7 @@ _watch() {
 
         mkdir -p "$post_directory"
         touch "$post_directory/index.md"
-        echo -e  "---\ntitle: $post_title\ndate: $post_date\n---\n" > "$post_directory/index.md"
+        echo -e  "---\ntitle: $post_title\ndate: $post_date\ntimestamp: $timestamp\n---\n" > "$post_directory/index.md"
 
         "$EDITOR" "$post_directory/index.md"
     }
