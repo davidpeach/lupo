@@ -288,7 +288,7 @@ _index() {
         if (( count % 20 == 0 )); then
             printf " - %s\n" $count
         fi
-    done < <(find "$SRC_DIRECTORY" -type f -printf '%h\0%d\0%p\n' | sort -t '\0' -n | awk -F '\0' '{print $3}')
+    done < <(find "$SRC_DIRECTORY" -type f -printf '%h\0%d\0%p\n' | sort -r -t '\0' -n | awk -F '\0' '{print $3}')
 
     echo -e "Creating markdown pages.\n\n"
 
