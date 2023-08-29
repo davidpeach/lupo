@@ -20,7 +20,8 @@ if [[ -n $COMP_LINE ]]; then
 fi
 
 declare LUPO_DIRECTORY="$PWD"
-declare CONFIG_FILE="$LUPO_DIRECTORY/.config"
+declare CONFIG_FILE="$HOME/.config/lupo/config"
+declare GITIGNORE_FILE="$LUPO_DIRECTORY/.gitignore"
 declare SRC_DIRECTORY="$LUPO_DIRECTORY/src"
 declare HTML_DIRECTORY="$LUPO_DIRECTORY/html"
 declare TMP_DIRECTORY="$LUPO_DIRECTORY/tmp"
@@ -32,7 +33,7 @@ declare domain_name=""
 declare remote_directory=""
 
 _parse_configuration() {
-    readarray -t lines < "$LUPO_DIRECTORY/.config"
+    readarray -t lines < "$CONFIG_FILE"
     for line in "${lines[@]}"; do
         [[ -z "$line" ]] && continue
         readarray -d ":" config_line <<< "$line"
@@ -152,7 +153,7 @@ _build_frontmatter() {
 _confirm_init_ran() {
     for folder in html src templates tmp; do
 
-        if [[ ! -d "$LUPO_DIRECTORY/$folder" || ! -e "$LUPO_DIRECTORY/.config" ]]; then
+        if [[ ! -d "$LUPO_DIRECTORY/$folder" || ! -e "$CONFIG_FILE" ]]; then
             echo "Missing directories. Please initialize your project with lupo init" && exit 1
         fi
     done
@@ -212,7 +213,12 @@ _init() {
     _create_dir_if_not_exists "$HTML_DIRECTORY"
     _create_dir_if_not_exists "$TEMPLATES_DIRECTORY"
     _create_dir_if_not_exists "$TMP_DIRECTORY"
+    _create_dir_if_not_exists "$(dirname "$CONFIG_FILE")"
     _create_file_if_not_exists "$CONFIG_FILE"
+    _create_file_if_not_exists "$GITIGNORE_FILE"
+
+    printf "html\ntmp" > "$GITIGNORE_FILE"
+
     if [[ -e "$HOME/.local/share/lupo/templates"  ]]; then
         cp -r "$HOME/.local/share/lupo/templates" "$LUPO_DIRECTORY"
     fi
