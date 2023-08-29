@@ -237,6 +237,7 @@ _index() {
     while IFS="" read -r src_file; do
 
         count=$((count + 1))
+        uri=$(_get_uri_from_src_file "$src_file")
 
         pandoc -s "$src_file" -o "$TMP_DIRECTORY/.vars.bash" --template="$TMP_DIRECTORY/.vars.template.bash" 2> /dev/null
 
@@ -278,7 +279,7 @@ _index() {
         if (( count % 20 == 0 )); then
           printf " - %s\n" $count
         fi
-    done < <(find "$SRC_DIRECTORY" -iname "*.md" -type f)
+    done < <(find "$SRC_DIRECTORY" -type f -printf '%h\0%d\0%p\n' | sort -t '\0' -n | awk -F '\0' '{print $3}')
 
     echo -e "Creating markdown pages.\n\n"
 
@@ -344,6 +345,7 @@ _build() {
 
 _post() {
   now=$(date "+%Y/%m")
+  post_date=$(date -I)
   printf "Please enter the post title: "
   read -r post_title
 
@@ -352,7 +354,7 @@ _post() {
 
   mkdir -p "$post_directory"
   touch "$post_directory/index.md"
-  echo -e  "---\ntitle: $post_title\n---\n" > "$post_directory/index.md"
+  echo -e  "---\ntitle: $post_title\ndate: $post_date\n---\n" > "$post_directory/index.md"
 
   "$EDITOR" "$post_directory/index.md"
 }
