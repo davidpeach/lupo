@@ -3,6 +3,7 @@
 declare -a commands=(
 build 
 clean
+deploy
 find
 index 
 init 
@@ -75,6 +76,12 @@ _clean() {
         rm -r "$html_path" 2> /dev/null
         echo "$html_path removed"
     done <  <(find "$HTML_DIRECTORY" -iname "*" -type d)
+}
+
+_deploy() {
+    _index
+    _build
+    _push
 }
 
 _find() {
@@ -193,6 +200,7 @@ _serve() {
 }
 
 _live() {
+    _deploy
     _watch "live"
 }
 
