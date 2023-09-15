@@ -95,7 +95,7 @@ _find() {
         exit 1
     fi
 
-    full_path=$(find "$SRC_DIRECTORY" -type f | fzf --preview='less {}')
+    full_path=$(find "$SRC_DIRECTORY" -type f -printf '%h\0%d\0%p\n' | sort -r -t '\0' -n | awk -F '\0' '{print $3}'| fzf --preview='less {}')
 
     twindow "$full_path" "${1:-""}" "${2:-"$EDITOR README.md"}" "${3:-""}"
 }
