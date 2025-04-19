@@ -5,11 +5,11 @@ TARGET_BIN_DIR="$HOME/.local/bin"
 TARGET_SHARE_DIR="$HOME/.local/share/lupo"
 
 # If the target directories don't exist, create them.
-[[ -e "$TARGET_BIN_DIR" ]] || mkdir -p "$TARGET_BIN_DIR"
-[[ -e "$TARGET_SHARE_DIR" ]] || mkdir -p "$TARGET_SHARE_DIR"
+[[ ! -d "$TARGET_BIN_DIR" ]] && echo "$TARGET_BIN_DIR does not exist." && exit 1
+[[ ! -d "$TARGET_SHARE_DIR" ]] && echo "$TARGET_SHARE_DIR does not exist." && exit 1
 
 # If lupo exists in the target bin directory, delete it first.
-[[ -f "$TARGET_BIN_DIR/lupo" ]] && rm "$TARGET_BIN_DIR/lupo"
+[[ -f "$TARGET_BIN_DIR/lupo" ]] && echo "Lupo already exists in $TARGET_BIN_DIR. Please remove it first." && exit 1
 
 # Copy the default templates and stylesheet into the share folder.
 cp -r "$(pwd)/templates" "$TARGET_SHARE_DIR"

@@ -25,7 +25,8 @@ rm -rf ./lupo
 ## Dependancies
 - [Pandoc](https://pandoc.org/installing.html) is **required** for convert markdown files into html. This is quite a hefty requirement along with its own dependancies, I am looking for alternatives.
 - [rsync](https://rsync.samba.org/) is **required** for using the `push` command.
-- [inotifywait](https://man.archlinux.org/man/inotifywait.1) is **required** for using the watch command.
+- [inotifywait](https://man.archlinux.org/man/inotifywait.1) is **required** for using the `watch` command.
+- [docker](https://docs.docker.com/engine/install/) is **required** for using the `serve` command.
 
 ## Usage
 
