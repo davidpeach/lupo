@@ -56,6 +56,14 @@ _build() {
   done <  <(find "$TMP_DIRECTORY" -iname "*" -type f)
 
   echo -e "\nBuild complete"
+
+  find "$HTML_DIRECTORY" -name "*.html" -exec perl -pi -e '
+  s{(href|src)=(")/src/}{$1=$2/}g;
+  s{(href|src)=('\'')/src/}{$1=$2/}g;
+  s{\.md(['\''"#?])}{.html$1}g;
+  s{/README\.html(['\''"#?])}{/$1}g;
+  ' {} +
+
 }
 
 _clean() {
