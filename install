@@ -4,16 +4,18 @@
 TARGET_BIN_DIR="$HOME/.local/bin"
 TARGET_SHARE_DIR="$HOME/.local/share/lupo"
 
-# If the target directories don't exist, create them.
+# If the target bin directory doesn't exist, bail out.
 [[ ! -d "$TARGET_BIN_DIR" ]] && echo "$TARGET_BIN_DIR does not exist." && exit 1
-[[ ! -d "$TARGET_SHARE_DIR" ]] && echo "$TARGET_SHARE_DIR does not exist." && exit 1
 
-# If lupo exists in the target bin directory, delete it first.
+# If the Lupo share folder doesn't exist, create it.
+[[ ! -d "$TARGET_SHARE_DIR" ]] && mkdir -p "$TARGET_SHARE_DIR" && echo "$TARGET_SHARE_DIR created."
+
+# If Lupo exists in the target bin directory, notify the person and bail out.
 [[ -f "$TARGET_BIN_DIR/lupo" ]] && echo "Lupo already exists in $TARGET_BIN_DIR. Please remove it first." && exit 1
 
-# Copy the default templates and stylesheet into the share folder.
+# Copy the default templates and stylesheet into the Lupo share folder.
 cp -r "$(pwd)/templates" "$TARGET_SHARE_DIR"
 cp "$(pwd)/style.css" "$TARGET_SHARE_DIR"
 
-# Finally, copy the lupo script into the target directory. 
+# Finally, copy the lupo script into the target bin directory. 
 cp "$(pwd)/lupo" "$TARGET_BIN_DIR"
