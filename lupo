@@ -275,7 +275,7 @@ _watch() {
         CREATE)
           _convert_file "$dir$file"
           _index
-          _convert_file "$TMP_DIRECTORY/index/index.md" "$TMP_DIRECTORY"
+          _convert_file "$TMP_DIRECTORY/index/README.md" "$TMP_DIRECTORY"
           ;;
         MODIFY)
           _convert_file "$dir$file"
@@ -286,7 +286,7 @@ _watch() {
           filepath="${filepath/%md/html}"
           rm "$filepath"
           _index
-          _convert_file "$TMP_DIRECTORY/index/index.md" "$TMP_DIRECTORY"
+          _convert_file "$TMP_DIRECTORY/index/README.md" "$TMP_DIRECTORY"
           ;;
       esac
       if [[ $1 == 'live' ]]; then
