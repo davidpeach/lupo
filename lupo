@@ -250,7 +250,9 @@ _new() {
   uri_title="${post_title,,}"
   uri_title="${uri_title// /-}"
 
-  post_directory="$SRC_DIRECTORY/$uri_date/$timestamp/$uri_title"
+  # Make this a configurable thing.
+  #post_directory="$SRC_DIRECTORY/$uri_date/$timestamp/$uri_title"
+  post_directory="$SRC_DIRECTORY/$uri_title"
   mkdir -p "$post_directory"
   full_path="$post_directory/README.md"
   touch "$full_path"
