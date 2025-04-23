@@ -122,16 +122,16 @@ _index() {
 
     if [[ 
       $src_file == "${src_file::-9}style.css" ||
-        $src_file == "${src_file::-9}script.js"
-                $src_file == "${src_file::-20}apple-touch-icon.png" ||
-                $src_file == "${src_file::-17}favicon-32x32.png" ||
-                $src_file == "${src_file::-17}favicon-16x16.png" ||
-                $src_file == "${src_file::-11}favicon.ico" ||
-                $src_file == "${src_file::-16}site.webmanifest" ||
-                $src_file == "${src_file::-3}ttf"
+        $src_file == "${src_file::-9}script.js" ||
+        $src_file == "${src_file::-20}apple-touch-icon.png" ||
+        $src_file == "${src_file::-17}favicon-32x32.png" ||
+        $src_file == "${src_file::-17}favicon-16x16.png" ||
+        $src_file == "${src_file::-11}favicon.ico" ||
+        $src_file == "${src_file::-16}site.webmanifest" ||
+        $src_file == "${src_file::-3}ttf"
 
-              ]]
-            then
+      ]]
+    then
               continue
     fi
 
