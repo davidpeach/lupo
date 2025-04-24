@@ -5,6 +5,7 @@ build
 clean
 deploy
 find
+healthcheck
 index 
 init 
 live
@@ -106,6 +107,147 @@ _find() {
   full_path=$(find "$SRC_DIRECTORY" -type f -printf '%h\0%d\0%p\n' | sort -r -t '\0' -n | awk -F '\0' '{print $3}'| fzf --preview='less {}')
 
   twindow "$full_path" "${1:-""}" "${2:-"$EDITOR README.md"}" "${3:-""}"
+}
+
+_healthcheck() {
+  declare installed_pandoc=false
+  declare installed_fzf=false
+  declare installed_rsync=false
+  declare installed_inotifywait=false
+  declare installed_docker=false
+
+  if [[ -x "$(command -v pandoc)" ]]; then
+    installed_pandoc=true
+  fi
+
+  if [[ -x "$(command -v fzf)" ]]; then
+    installed_fzf=true
+  fi
+
+  if [[ -x "$(command -v rsync)" ]]; then
+    installed_rsync=true
+  fi
+
+  if [[ -x "$(command -v inotifywait )" ]]; then
+    installed_inotifywait=true
+  fi
+
+  if [[ -x "$(command -v docker)" ]]; then
+    installed_docker=true
+  fi
+
+
+  echo " Lupo Healthcheck"
+  echo " ==================="
+
+  count_build=0
+  count_index=0
+  count_deploy=0
+  count_find=0
+  count_live=0
+  count_push=0
+  count_watch=0
+  count_serve=0
+
+  success_color="\e[1;92m"
+  failure_color="\e[1;91m"
+  clear_color="\e[0m"
+
+  if [[ $installed_pandoc == true ]]; then
+    echo -e " Pandoc is installed ${success_color}✔️${clear_color}"
+    count_index=$((count_index+1))
+    count_build=$((count_build+1))
+    count_deploy=$((count_deploy+1))
+    count_live=$((count_live+1))
+  else
+    echo -e " Pandoc not installed ${failure_color}✖️${clear_color}"
+  fi
+
+  if [[ $installed_fzf == true ]]; then
+    echo -e " FZF is installed ${success_color}✔️${clear_color}"
+    count_find=$((count_find+1))
+  else
+    echo -e " FZF not installed ${failure_color}✖️${clear_color}"
+  fi
+
+  if [[ $installed_rsync == true ]]; then
+    echo -e " rsync is installed ${success_color}✔️${clear_color}"
+    count_deploy=$((count_deploy+1))
+    count_live=$((count_live+1))
+    count_push=$((count_push+1))
+  else
+    echo -e " rsync not installed ${failure_color}✖️${clear_color}"
+  fi
+
+  if [[ $installed_inotifywait == true ]]; then
+    echo -e " inotifywait is installed ${success_color}✔️${clear_color}"
+    count_live=$((count_live+1))
+    count_watch=$((count_watch+1))
+    count_deploy=$((count_deploy+1))
+  else
+    echo -e " inotifywait not installed ${failure_color}✖️${clear_color}"
+  fi
+
+  if [[ $installed_docker == true ]]; then
+    echo -e " docker is installed ${success_color}✔️${clear_color}"
+    count_serve=$((count_serve+1))
+  else
+    echo -e " docker not installed ${failure_color}✖️${clear_color}"
+  fi
+
+  if [[ $count_serve == 1 ]]; then
+    serve_color=$success_color
+  else
+    serve_color=$failure_color
+  fi
+
+  if [[ $count_find == 1 ]]; then
+    find_color=$success_color
+  else
+    find_color=$failure_color
+  fi
+
+  if [[ $count_index == 1 ]]; then
+    index_color=$success_color
+  else
+    index_color=$failure_color
+  fi
+
+  if [[ $count_build == 1 ]]; then
+    build_color=$success_color
+  else
+    build_color=$failure_color
+  fi
+
+  if [[ $count_watch == 1 ]]; then
+    watch_color=$success_color
+  else
+    watch_color=$failure_color
+  fi
+
+  if [[ $count_push == 1 ]]; then
+    push_color=$success_color
+  else
+    push_color=$failure_color
+  fi
+
+  if [[ $count_deploy == 3 ]]; then
+    deploy_color=$success_color
+  else
+    deploy_color=$failure_color
+  fi
+
+  if [[ $count_live == 3 ]]; then
+    live_color=$success_color
+  else
+    live_color=$failure_color
+  fi
+  
+  echo ""
+  echo " Available commands"
+  echo -e  "${success_color} init${clear_color} ${success_color}  new${clear_color} ${find_color}    find${clear_color} ${index_color}  index${clear_color}"
+  echo -e  "${build_color} build${clear_color} ${serve_color} serve${clear_color} ${watch_color}  watch${clear_color} ${push_color} push${clear_color}"
+  echo -e  "${success_color} clean${clear_color} ${deploy_color} deploy${clear_color} ${live_color} live${clear_color} ${success_color}  healthcheck${clear_color}"
 }
 
 _index() {
