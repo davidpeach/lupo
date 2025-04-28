@@ -23,12 +23,5 @@
         <a href="/tags/">Tags</a>
         <a href="/index/">Everything</a>
     </nav>
-    $if(tags)$
-    <div>
-        $for(tags)$
-        <a href="/tags/$tags$/">$tags$</a>
-        $endfor$
-    </div>
-    $endif$
-    <div>$body$</div>
+    <main>$body$</main>
 </body>

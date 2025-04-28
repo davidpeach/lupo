@@ -1,4 +1,4 @@
-<!html>
+<!doctype html>
 <head>
     <meta charset="utf-8" />
     <title>
@@ -23,18 +23,20 @@
         <a href="/tags/">Tags</a>
         <a href="/index/">Everything</a>
     </nav>
-    <ul>
-    $for(items)$
-        <li>
-            <date>$items.date$</date>
-            <a href="$items.uri$">
-                $if(items.title)$
-                    $items.title$
-                $else$
-                    $items.uri$
-                $endif$
-            </a>
-        </li>
-    $endfor$
-    </ul>
+    <main>
+        <ul>
+        $for(items)$
+            <li>
+                <date>$items.date$</date>
+                <a href="$items.uri$">
+                    $if(items.title)$
+                        $items.title$
+                    $else$
+                        $items.uri$
+                    $endif$
+                </a>
+            </li>
+        $endfor$
+        </ul>
+    </main>
 </body>
