@@ -3,6 +3,7 @@
 declare -a commands=(
 build 
 clean
+config
 deploy
 find
 healthcheck
@@ -90,6 +91,75 @@ _clean() {
     rm -r "$html_path" 2> /dev/null
     echo "$html_path removed"
   done <  <(find "$HTML_DIRECTORY" -iname "*" -type d)
+}
+
+_config() {
+  echo "Config Helper"
+  
+  declare config_remote_user
+  printf "Please enter your remote_user name: "
+  read -r config_remote_user
+
+  declare config_ssh_identity_key
+  printf "Please enter your ssh_identity_key: "
+  read -r config_ssh_identity_key
+
+  declare config_domain_name
+  printf "Please enter your domain_name: "
+  read -r config_domain_name
+
+  declare config_remote_directory
+  printf "Please enter your remote_directory: "
+  read -r config_remote_directory
+
+  declare config_post_url_style
+  printf "Please enter your post_url_style: "
+  read -r config_post_url_style
+
+  declare config_string
+
+  config_string+="# Start of generated lupo config\n"
+
+  if [[ -n $config_remote_user ]]; then
+    config_string+="remote_user: ${config_remote_user}\n"
+  fi
+
+  if [[ -n $config_ssh_identity_key ]]; then
+    config_string+="ssh_identity_key: ${config_ssh_identity_key}\n"
+  fi
+
+  if [[ -n $config_domain_name ]]; then
+    config_string+="domain_name: ${config_domain_name}\n"
+  fi
+
+  if [[ -n $config_remote_directory ]]; then
+    config_string+="remote_directory: ${config_remote_directory}\n"
+  fi
+
+  if [[ -n $config_post_url_style ]]; then
+    config_string+="post_url_style: ${config_post_url_style}\n"
+  fi
+
+  config_string+="# End of generated lupo config"
+
+  if [[ -e $CONFIG_FILE ]]; then
+    echo -e "\nPlease copy this config into your lupo config for this site at:\n$CONFIG_FILE\n"
+    echo -e "$config_string"
+  else
+    printf "\nWould you like me to create a config file for you at:\n%s ? [Y/N] \n" "$CONFIG_FILE"
+    read -r create_config_file
+
+    if [[ $create_config_file == "Y" ]]; then
+      touch "$CONFIG_FILE"
+      echo -e "$config_string" >> "$CONFIG_FILE"
+    else
+    echo -e "\nPlease copy this config into a lupo config file for this site at:\n$CONFIG_FILE\n"
+    echo -e "$config_string"
+    fi
+  fi
+
+  
+  echo -e "\n"
 }
 
 _deploy() {
@@ -438,6 +508,11 @@ _watch() {
   }
 
   _parse_configuration() {
+
+    if [[ ! -e $CONFIG_FILE ]]; then
+      return
+    fi
+
     readarray -t lines < "$CONFIG_FILE"
     for line in "${lines[@]}"; do
       [[ -z "$line" ]] && continue
@@ -453,6 +528,7 @@ _watch() {
         ssh_identity_key) ssh_identity_key="$value";;
         domain_name) domain_name="$value";;
         remote_directory) remote_directory="$value";;
+        post_url_style) post_url_style="$value";;
       esac
     done
   }
@@ -560,7 +636,7 @@ _watch() {
 
   _confirm_init_ran() {
     for folder in html src templates tmp; do
-      if [[ ! -d "$LUPO_DIRECTORY/$folder" || ! -e "$CONFIG_FILE" ]]; then
+      if [[ ! -d "$LUPO_DIRECTORY/$folder" ]]; then
         echo "Missing directories. Please initialize your project with lupo init" && exit 1
       fi
     done
