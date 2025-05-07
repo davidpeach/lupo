@@ -95,7 +95,7 @@ _clean() {
 
 _config() {
   echo "Config Helper"
-  
+
   declare config_remote_user
   printf "Please enter your remote_user name: "
   read -r config_remote_user
@@ -153,12 +153,12 @@ _config() {
       touch "$CONFIG_FILE"
       echo -e "$config_string" >> "$CONFIG_FILE"
     else
-    echo -e "\nPlease copy this config into a lupo config file for this site at:\n$CONFIG_FILE\n"
-    echo -e "$config_string"
+      echo -e "\nPlease copy this config into a lupo config file for this site at:\n$CONFIG_FILE\n"
+      echo -e "$config_string"
     fi
   fi
 
-  
+
   echo -e "\n"
 }
 
@@ -312,7 +312,7 @@ _healthcheck() {
   else
     live_color=$failure_color
   fi
-  
+
   echo ""
   echo " Available commands"
   echo -e  "${success_color} init${clear_color} ${success_color}  new${clear_color} ${find_color}    find${clear_color} ${index_color}  index${clear_color}"
@@ -344,7 +344,7 @@ _index() {
 
       ]]
     then
-              continue
+      continue
     fi
 
     count=$((count + 1))
