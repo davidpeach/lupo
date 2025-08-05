@@ -1,23 +1,56 @@
 #!/usr/bin/bash
 
-declare -a commands=(
-build 
-clean
-config
-deploy
-find
-healthcheck
-index 
-init 
-live
-new 
-push 
-serve
-watch
+style_heading="\033[36;1;210m"
+style_subheading="\033[32;3;1m"
+style_desc="\033[210;3m"
+style_clear="\033[0m"
+color_text_peach="\033[38;5;217m"
+color_text_a="\033[38;5;217m"
+color_text_b="\033[38;5;217m"
+style_emphasis="\033[38;5;206m"
+color_clear="\033[0m"
+
+declare -A commands=(
+[build]="Build your website from your source files."
+[clean]="Clean your website of files removed from source."
+[config]="Answer a set of questions in order to generate a configuration for your website."
+[deploy]="Full deployment (index, build and push) to your remote server."
+[find]="Find a post or page."
+[healthcheck]="Diagnose issues and see which required programs are missing from your system."
+[index]="Create the index pages for your site (taxonomy and all post indexes)."
+[init]="Initiallize your folder to be a new Lupo website."
+[live]="Automatically build and deploy your website on source changes."
+[new]="Create a new post for your site."
+[push]="Push your built website to your configured remote server ${style_emphasis}rsync required${style_clear}"
+[serve]="Serve your website locally. ${style_emphasis}Docker required${style_clear}"
+[watch]="Watch your source files for changes and automatically rebuild."
 )
 
+if [[ -z "$1" ]];
+then
+	echo -e "${style_heading}Lupo${style_clear}"
+	echo -e " ${style_desc}Build your static website from Markdown, HTML, CSS and JavaScript.${style_clear}"
+	echo -e ""
+	echo -e "USAGE\n${style_subheading} $0 <command>${style_clear}"
+	echo -e ""
+	echo -e "COMMANDS"
+  
+  for key in "${!commands[@]}"
+  do
+    len="${#key}"
+    num_spaces=$((15-len))
+    spaces=""
+    for (( i=1;i<=num_spaces;i++ ))
+    do
+      spaces+=" "
+    done
+    echo -e " ${style_subheading}${key}${style_clear}${spaces}${commands[$key]}"
+  done
+	exit 0
+fi
+
 if [[ -n $COMP_LINE ]]; then
-  for c in "${commands[@]}"; do
+  for c in "${!commands[@]}"; do
     [[ ${c:0:${#2}} == "${2,,}" ]] && echo "$c"
   done
   exit
@@ -94,7 +127,7 @@ _clean() {
 }
 
 _config() {
-  echo "Config Helper"
+  echo -e "${style_heading}Lupo Configuration Helper${color_clear}"
 
   declare config_remote_user
   printf "Please enter your remote_user name: "
@@ -699,7 +732,7 @@ _watch() {
   }
 
   declare CMD="$1"; shift
-  for c in "${commands[@]}"; do
+  for c in "${!commands[@]}"; do
 
     if [[ $CMD != 'init' ]]; then
       _confirm_init_ran
