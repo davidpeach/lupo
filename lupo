@@ -1,22 +1,56 @@
 #!/usr/bin/bash
 
-declare -a commands=(
-build 
-clean
-deploy
-find
-healthcheck
-index 
-init 
-live
-new 
-push 
-serve
-watch
+style_heading="\033[36;1;210m"
+style_subheading="\033[32;3;1m"
+style_desc="\033[210;3m"
+style_clear="\033[0m"
+color_text_peach="\033[38;5;217m"
+color_text_a="\033[38;5;217m"
+color_text_b="\033[38;5;217m"
+style_emphasis="\033[38;5;206m"
+color_clear="\033[0m"
+
+declare -A commands=(
+[build]="Build your website from your source files."
+[clean]="Clean your website of files removed from source."
+[config]="Answer a set of questions in order to generate a configuration for your website."
+[deploy]="Full deployment (index, build and push) to your remote server."
+[find]="Find a post or page."
+[healthcheck]="Diagnose issues and see which required programs are missing from your system."
+[index]="Create the index pages for your site (taxonomy and all post indexes)."
+[init]="Initiallize your folder to be a new Lupo website."
+[live]="Automatically build and deploy your website on source changes."
+[new]="Create a new post for your site."
+[push]="Push your built website to your configured remote server ${style_emphasis}rsync required${style_clear}"
+[serve]="Serve your website locally. ${style_emphasis}Docker required${style_clear}"
+[watch]="Watch your source files for changes and automatically rebuild."
 )
 
+if [[ -z "$1" ]];
+then
+	echo -e "${style_heading}Lupo${style_clear}"
+	echo -e " ${style_desc}Build your static website from Markdown, HTML, CSS and JavaScript.${style_clear}"
+	echo -e ""
+	echo -e "USAGE\n${style_subheading} $0 <command>${style_clear}"
+	echo -e ""
+	echo -e "COMMANDS"
+  
+  for key in "${!commands[@]}"
+  do
+    len="${#key}"
+    num_spaces=$((15-len))
+    spaces=""
+    for (( i=1;i<=num_spaces;i++ ))
+    do
+      spaces+=" "
+    done
+    echo -e " ${style_subheading}${key}${style_clear}${spaces}${commands[$key]}"
+  done
+	exit 0
+fi
+
 if [[ -n $COMP_LINE ]]; then
-  for c in "${commands[@]}"; do
+  for c in "${!commands[@]}"; do
     [[ ${c:0:${#2}} == "${2,,}" ]] && echo "$c"
   done
   exit
@@ -90,6 +124,75 @@ _clean() {
     rm -r "$html_path" 2> /dev/null
     echo "$html_path removed"
   done <  <(find "$HTML_DIRECTORY" -iname "*" -type d)
+}
+
+_config() {
+  echo -e "${style_heading}Lupo Configuration Helper${color_clear}"
+
+  declare config_remote_user
+  printf "Please enter your remote_user name: "
+  read -r config_remote_user
+
+  declare config_ssh_identity_key
+  printf "Please enter your ssh_identity_key: "
+  read -r config_ssh_identity_key
+
+  declare config_domain_name
+  printf "Please enter your domain_name: "
+  read -r config_domain_name
+
+  declare config_remote_directory
+  printf "Please enter your remote_directory: "
+  read -r config_remote_directory
+
+  declare config_post_url_style
+  printf "Please enter your post_url_style: "
+  read -r config_post_url_style
+
+  declare config_string
+
+  config_string+="# Start of generated lupo config\n"
+
+  if [[ -n $config_remote_user ]]; then
+    config_string+="remote_user: ${config_remote_user}\n"
+  fi
+
+  if [[ -n $config_ssh_identity_key ]]; then
+    config_string+="ssh_identity_key: ${config_ssh_identity_key}\n"
+  fi
+
+  if [[ -n $config_domain_name ]]; then
+    config_string+="domain_name: ${config_domain_name}\n"
+  fi
+
+  if [[ -n $config_remote_directory ]]; then
+    config_string+="remote_directory: ${config_remote_directory}\n"
+  fi
+
+  if [[ -n $config_post_url_style ]]; then
+    config_string+="post_url_style: ${config_post_url_style}\n"
+  fi
+
+  config_string+="# End of generated lupo config"
+
+  if [[ -e $CONFIG_FILE ]]; then
+    echo -e "\nPlease copy this config into your lupo config for this site at:\n$CONFIG_FILE\n"
+    echo -e "$config_string"
+  else
+    printf "\nWould you like me to create a config file for you at:\n%s ? [Y/N] \n" "$CONFIG_FILE"
+    read -r create_config_file
+
+    if [[ $create_config_file == "Y" ]]; then
+      touch "$CONFIG_FILE"
+      echo -e "$config_string" >> "$CONFIG_FILE"
+    else
+      echo -e "\nPlease copy this config into a lupo config file for this site at:\n$CONFIG_FILE\n"
+      echo -e "$config_string"
+    fi
+  fi
+
+
+  echo -e "\n"
 }
 
 _deploy() {
@@ -242,7 +345,7 @@ _healthcheck() {
   else
     live_color=$failure_color
   fi
-  
+
   echo ""
   echo " Available commands"
   echo -e  "${success_color} init${clear_color} ${success_color}  new${clear_color} ${find_color}    find${clear_color} ${index_color}  index${clear_color}"
@@ -274,7 +377,7 @@ _index() {
 
       ]]
     then
-              continue
+      continue
     fi
 
     count=$((count + 1))
@@ -346,7 +449,6 @@ _init() {
   _create_dir_if_not_exists "$TEMPLATES_DIRECTORY"
   _create_dir_if_not_exists "$TMP_DIRECTORY"
   _create_dir_if_not_exists "$(dirname "$CONFIG_FILE")"
-  _create_file_if_not_exists "$CONFIG_FILE"
   _create_file_if_not_exists "$GITIGNORE_FILE"
 
   printf "html\ntmp" > "$GITIGNORE_FILE"
@@ -438,6 +540,11 @@ _watch() {
   }
 
   _parse_configuration() {
+
+    if [[ ! -e $CONFIG_FILE ]]; then
+      return
+    fi
+
     readarray -t lines < "$CONFIG_FILE"
     for line in "${lines[@]}"; do
       [[ -z "$line" ]] && continue
@@ -453,6 +560,7 @@ _watch() {
         ssh_identity_key) ssh_identity_key="$value";;
         domain_name) domain_name="$value";;
         remote_directory) remote_directory="$value";;
+        post_url_style) post_url_style="$value";;
       esac
     done
   }
@@ -560,7 +668,7 @@ _watch() {
 
   _confirm_init_ran() {
     for folder in html src templates tmp; do
-      if [[ ! -d "$LUPO_DIRECTORY/$folder" || ! -e "$CONFIG_FILE" ]]; then
+      if [[ ! -d "$LUPO_DIRECTORY/$folder" ]]; then
         echo "Missing directories. Please initialize your project with lupo init" && exit 1
       fi
     done
@@ -623,7 +731,7 @@ _watch() {
   }
 
   declare CMD="$1"; shift
-  for c in "${commands[@]}"; do
+  for c in "${!commands[@]}"; do
 
     if [[ $CMD != 'init' ]]; then
       _confirm_init_ran
